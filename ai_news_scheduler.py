@@ -13,7 +13,9 @@ workflow = AINewsWorkflow(GEMINI_API_KEY)
 # Generate AI news
 # ------------------------
 result = workflow.create_daily_ai_news_post()
-full_news_text = result.get("text") or "Here are today's AI news highlights."
+full_news_text = result.get("generated_content").content  # <-- Use content attribute
+if not full_news_text:
+    full_news_text = "Here are today's AI news highlights."
 
 # ------------------------
 # Split into segments
@@ -25,14 +27,14 @@ if not news_segments:
 video_clips = []
 
 for i, segment in enumerate(news_segments):
-    # 1️⃣ Generate TTS audio for this segment
+    # 1️⃣ Generate TTS audio
     audio_file = f"segment_{i}.mp3"
     tts = gTTS(text=segment, lang='en')
     tts.save(audio_file)
     audio_clip = AudioFileClip(audio_file)
     duration = audio_clip.duration
 
-    # 2️⃣ Create base video (1280x720) with dark background
+    # 2️⃣ Create base video
     clip = ColorClip(size=(1280, 720), color=(10, 10, 50)).set_duration(duration)
 
     # 3️⃣ Center main news text
@@ -40,15 +42,14 @@ for i, segment in enumerate(news_segments):
                          method='caption', size=(1100, 500))
     main_text = main_text.set_position('center').set_duration(duration)
 
-    # 4️⃣ Scrolling ticker at bottom
+    # 4️⃣ Scrolling ticker
     ticker_text = TextClip(segment + " — " + segment, fontsize=30, color='yellow',
                            font='Arial-Bold', method='caption', size=(3000, 60))
     ticker = ticker_text.set_position(lambda t: (1280 - t*200, 650)).set_duration(duration)
 
-    # 5️⃣ Combine video + text + ticker + audio
+    # 5️⃣ Combine video + audio
     final_clip = CompositeVideoClip([clip, main_text, ticker])
     final_clip = final_clip.set_audio(audio_clip)
-
     video_clips.append(final_clip)
 
 # ------------------------
