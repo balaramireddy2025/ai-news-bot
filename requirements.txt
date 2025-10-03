@@ -3,3 +3,5 @@ beautifulsoup4
 schedule
 google-generativeai
 requests
+gtts
+requests
