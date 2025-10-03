@@ -36,35 +36,47 @@ def generate_tts_audio(text, filename="news_audio.mp3"):
     logger.info("🎤 Generating TTS audio...")
     tts = gTTS(text=text, lang='en')
     tts.save(filename)
-    logger.info(f"✅ TTS audio saved as {filename}")
+    logger.info(f"✅ Audio saved as {filename}")
     return filename
 
 def create_news_clip(text, audio_file, width=1280, height=720, fontsize=40, duration_per_slide=8):
-    logger.info("🎬 Creating video slides...")
     paragraphs = [p.strip() for p in text.split("\n") if p.strip()]
     clips = []
 
-    for i, paragraph in enumerate(paragraphs):
-        logger.info(f"  ➤ Processing slide {i+1}/{len(paragraphs)}")
-        # Create text clip
-        txt_clip = TextClip(paragraph, fontsize=fontsize, color='white', size=(width-100, None), method='caption')
-        txt_clip = txt_clip.set_duration(duration_per_slide).set_position(('center', 'center')).on_color(color=(0,0,0), col_opacity=1)
+    audio = AudioFileClip(audio_file)
+    audio_duration = audio.duration
+    logger.info(f"🎵 Audio duration: {audio_duration:.2f}s")
 
-        # Create scrolling ticker
-        ticker_text = paragraph[:80] + " ..."  # first 80 chars
-        ticker_clip = TextClip(ticker_text, fontsize=24, color='yellow', size=(width*2, 30), method='caption')
-        ticker_clip = ticker_clip.set_duration(duration_per_slide).set_position(('left', height-40))
-        ticker_clip = ticker_clip.set_start(0).fx(lambda c: c.set_position(lambda t: ('center', height-40)))
+    for i, paragraph in enumerate(paragraphs):
+        logger.info(f"📝 Creating slide {i+1}/{len(paragraphs)}")
+        # Text clip
+        txt_clip = TextClip(
+            paragraph,
+            fontsize=fontsize,
+            color='white',
+            size=(width-100, None),
+            method='caption'
+        ).set_duration(duration_per_slide).set_position(('center', 'center')).on_color(color=(0,0,0), col_opacity=1)
+
+        # Scrolling ticker at bottom
+        ticker_text = paragraph[:80] + "..." if len(paragraph) > 80 else paragraph
+        ticker_clip = TextClip(ticker_text, fontsize=24, color='yellow', size=(width, 30), method='caption')
+        ticker_clip = ticker_clip.set_duration(duration_per_slide).set_position(('left', height-40)).set_start(0)
 
         # Composite slide
         clip = CompositeVideoClip([txt_clip, ticker_clip])
         clips.append(clip)
 
-    # Concatenate all slides
+    # Concatenate slides
     video = concatenate_videoclips(clips, method="compose")
-    audio = AudioFileClip(audio_file)
+    # Trim or loop audio to match video length
+    if audio.duration > video.duration:
+        audio = audio.subclip(0, video.duration)
+    else:
+        audio = audio.set_duration(video.duration)
     video = video.set_audio(audio)
-    logger.info("✅ All slides processed, video ready.")
+    logger.info("🎬 Video clip created with audio")
+
     return video
 
 # -----------------------------
@@ -72,29 +84,34 @@ def create_news_clip(text, audio_file, width=1280, height=720, fontsize=40, dura
 # -----------------------------
 def job():
     logger.info("⏰ Running AI News workflow...")
-    result = workflow.create_daily_ai_news_post()
-    news_content = result['generated_content'].content
+    try:
+        result = workflow.create_daily_ai_news_post()
+        news_content = result['generated_content'].content
+        logger.info("📰 News content generated successfully")
 
-    # Generate audio
-    audio_file = generate_tts_audio(news_content, "news_audio.mp3")
+        # Generate TTS
+        audio_file = generate_tts_audio(news_content, "news_audio.mp3")
 
-    # Create video
-    video = create_news_clip(news_content, audio_file)
-    logger.info("💾 Writing video file...")
-    video.write_videofile(VIDEO_OUTPUT_FILE, fps=24, codec="libx264", audio_codec="aac", verbose=True, progress_bar=True)
-    logger.info(f"✅ Video generated: {VIDEO_OUTPUT_FILE}")
+        # Create video
+        video = create_news_clip(news_content, audio_file)
+        logger.info(f"💾 Writing video to {VIDEO_OUTPUT_FILE}...")
+        video.write_videofile(VIDEO_OUTPUT_FILE, fps=24, codec="libx264", audio_codec="aac")
+        logger.info(f"✅ Video saved: {VIDEO_OUTPUT_FILE}")
 
-    # Send to Telegram
-    if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
-        logger.info(f"📤 Sending video to Telegram chat {TELEGRAM_CHAT_ID}...")
-        with open(VIDEO_OUTPUT_FILE, 'rb') as f:
-            files = {'video': f}
-            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendVideo?chat_id={TELEGRAM_CHAT_ID}"
-            r = requests.post(url, files=files)
-        if r.status_code == 200:
-            logger.info("✅ Video sent to Telegram successfully!")
-        else:
-            logger.warning(f"❌ Failed to send video to Telegram: {r.text}")
+        # Telegram (optional)
+        if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+            logger.info(f"📤 Sending video to Telegram chat {TELEGRAM_CHAT_ID}...")
+            with open(VIDEO_OUTPUT_FILE, 'rb') as f:
+                files = {'video': f}
+                url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendVideo?chat_id={TELEGRAM_CHAT_ID}"
+                r = requests.post(url, files=files)
+                if r.status_code == 200:
+                    logger.info(f"✅ Video sent to Telegram chat {TELEGRAM_CHAT_ID}")
+                else:
+                    logger.warning(f"❌ Failed to send video: {r.text}")
+
+    except Exception as e:
+        logger.error(f"❌ Job failed: {e}")
 
 # -----------------------------
 # SCHEDULER
