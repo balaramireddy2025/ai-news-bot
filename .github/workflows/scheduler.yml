@@ -6,14 +6,14 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  run-news:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v3
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: 3.12
