@@ -1,110 +1,81 @@
-# ai_news_scheduler.py
 import os
-import logging
+import requests
 from datetime import datetime
 from gtts import gTTS
-from moviepy.editor import TextClip, ColorClip, CompositeVideoClip, AudioFileClip
-import requests
-import schedule
-import time
 
-# ---------------- CONFIG ----------------
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
-VIDEO_OUTPUT_DIR = "videos"
+# Correct MoviePy 2.1.1 imports
+from moviepy.video.VideoClip import TextClip, ColorClip
+from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
+from moviepy.video.compositing.concatenate import concatenate_videoclips
+from moviepy.audio.io.AudioFileClip import AudioFileClip
+
+# -------------------- CONFIG --------------------
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")  # set in GitHub Actions secrets
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")      # set in GitHub Actions secrets
+
 VIDEO_WIDTH = 720
 VIDEO_HEIGHT = 480
-VIDEO_BG_COLOR = (30, 30, 30)  # dark gray
-VIDEO_DURATION_PER_SCREEN = 8  # seconds per text clip
+BG_COLOR = (0, 0, 0)
+TEXT_COLOR = 'white'
 FONT_SIZE = 40
-FONT_COLOR = "white"
-FONT = "Arial-Bold"  # MoviePy built-in font, no ImageMagick
-# ---------------------------------------
+CLIP_DURATION = 5  # seconds per text block
+OUTPUT_VIDEO = "ai_news.mp4"
 
-logging.basicConfig(level=logging.INFO)
-os.makedirs(VIDEO_OUTPUT_DIR, exist_ok=True)
+# -------------------- AI NEWS --------------------
+# Replace this with your AI-generated content fetching logic
+AI_NEWS_POSTS = [
+    "AI is revolutionizing sustainable agriculture in India.",
+    "China Mobile and Huawei demonstrate 5G-A monetization.",
+    "MIT's Martin Trust Center appoints new Executive Director."
+]
 
-# ------------------ AI / News Fetching Stub ------------------
-# Replace this function with your AI news generator (e.g., Google GenAI)
-def fetch_ai_news():
-    """
-    Return a dict containing title and content text for the video.
-    """
-    return {
-        "title": "AI & Tech Update: Innovation Across Industries",
-        "content": (
-            "1. AI is revolutionizing sustainable farming.\n"
-            "2. 5G-A networks are unlocking immersive experiences.\n"
-            "3. Entrepreneurship and AI are shaping the future."
-        )
-    }
-
-# ------------------ Video Generation ------------------
-def generate_video_from_text(news_data):
-    logging.info("🎬 Generating video...")
-
-    # Generate TTS audio
-    tts = gTTS(text=news_data["content"], lang="en")
-    audio_path = os.path.join(VIDEO_OUTPUT_DIR, "tts.mp3")
-    tts.save(audio_path)
-
-    # Split content into lines
-    lines = news_data["content"].split("\n")
+# -------------------- FUNCTION TO CREATE VIDEO --------------------
+def generate_video(posts, output_file):
     clips = []
+    for post in posts:
+        # Text clip
+        txt_clip = TextClip(post, fontsize=FONT_SIZE, color=TEXT_COLOR, size=(VIDEO_WIDTH, VIDEO_HEIGHT), method='caption')
+        txt_clip = txt_clip.set_duration(CLIP_DURATION)
 
-    for line in lines:
-        txt_clip = TextClip(
-            line,
-            fontsize=FONT_SIZE,
-            color=FONT_COLOR,
-            font=FONT,
-            size=(VIDEO_WIDTH - 40, None),
-            method="caption"  # ensures proper wrapping
-        )
-        txt_clip = txt_clip.set_duration(VIDEO_DURATION_PER_SCREEN).set_position("center")
-        bg_clip = ColorClip(size=(VIDEO_WIDTH, VIDEO_HEIGHT), color=VIDEO_BG_COLOR, duration=VIDEO_DURATION_PER_SCREEN)
-        clips.append(CompositeVideoClip([bg_clip, txt_clip]))
+        # Background clip
+        bg_clip = ColorClip(size=(VIDEO_WIDTH, VIDEO_HEIGHT), color=BG_COLOR, duration=CLIP_DURATION)
 
-    # Concatenate all text clips
-    video = CompositeVideoClip(clips).set_duration(len(clips) * VIDEO_DURATION_PER_SCREEN)
+        # Combine background + text
+        clip = CompositeVideoClip([bg_clip, txt_clip.set_position('center')])
+        clips.append(clip)
 
-    # Add audio
-    audio_clip = AudioFileClip(audio_path)
-    video = video.set_audio(audio_clip).set_duration(audio_clip.duration)
+    # Concatenate all clips
+    final_clip = concatenate_videoclips(clips, method="compose")
 
-    # Export video
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_path = os.path.join(VIDEO_OUTPUT_DIR, f"ai_news_{timestamp}.mp4")
-    video.write_videofile(output_path, fps=24, codec="libx264", audio_codec="aac")
+    # Generate audio using gTTS
+    full_text = " ".join(posts)
+    tts = gTTS(full_text)
+    audio_file = "ai_news.mp3"
+    tts.save(audio_file)
 
-    logging.info(f"✅ Video generated at: {output_path}")
-    return output_path
+    # Attach audio
+    audio_clip = AudioFileClip(audio_file)
+    final_clip = final_clip.set_audio(audio_clip)
 
-# ------------------ Telegram Posting ------------------
-def send_to_telegram(video_path):
-    logging.info("📤 Sending video to Telegram...")
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendVideo"
-    with open(video_path, "rb") as f:
+    # Export MP4
+    final_clip.write_videofile(output_file, fps=24, codec="libx264")
+
+    # Clean up audio file
+    os.remove(audio_file)
+
+# -------------------- FUNCTION TO SEND TO TELEGRAM --------------------
+def send_to_telegram(video_file, chat_id, bot_token):
+    url = f"https://api.telegram.org/bot{bot_token}/sendVideo"
+    with open(video_file, 'rb') as f:
         files = {"video": f}
-        data = {"chat_id": TELEGRAM_CHAT_ID, "caption": "Daily AI News Update"}
-        resp = requests.post(url, data=data, files=files)
-    if resp.status_code == 200:
-        logging.info("✅ Video sent to Telegram successfully!")
-    else:
-        logging.error(f"❌ Failed to send video: {resp.text}")
+        data = {"chat_id": chat_id, "caption": f"AI News Update: {datetime.now().strftime('%Y-%m-%d %H:%M')}"}
+        response = requests.post(url, files=files, data=data)
+    print("Telegram response:", response.json())
 
-# ------------------ Main Workflow ------------------
-def run_workflow():
-    logging.info("⏰ Running AI News workflow...")
-    news = fetch_ai_news()
-    video_file = generate_video_from_text(news)
-    send_to_telegram(video_file)
-
-# ------------------ Scheduler ------------------
-schedule.every().day.at("04:40").do(run_workflow)  # UTC time for GitHub Actions
-
+# -------------------- MAIN --------------------
 if __name__ == "__main__":
-    logging.info("🟢 AI News Scheduler started.")
-    while True:
-        schedule.run_pending()
-        time.sleep(10)
+    print("⏰ Running AI News Scheduler...")
+    generate_video(AI_NEWS_POSTS, OUTPUT_VIDEO)
+    print(f"✅ Video generated: {OUTPUT_VIDEO}")
+    send_to_telegram(OUTPUT_VIDEO, TELEGRAM_CHAT_ID, TELEGRAM_BOT_TOKEN)
+    print("✅ Video sent to Telegram successfully!")
