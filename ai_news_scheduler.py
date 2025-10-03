@@ -4,7 +4,7 @@ from gtts import gTTS
 from moviepy.editor import *
 
 # ------------------------
-# Initialize workflow
+# Initialize AI news workflow
 # ------------------------
 GEMINI_API_KEY = "your_gemini_api_key_here"
 workflow = AINewsWorkflow(GEMINI_API_KEY)
@@ -25,34 +25,37 @@ if not news_segments:
 video_clips = []
 
 for i, segment in enumerate(news_segments):
-    # Generate TTS audio
+    # 1️⃣ Generate TTS audio for this segment
     audio_file = f"segment_{i}.mp3"
     tts = gTTS(text=segment, lang='en')
     tts.save(audio_file)
     audio_clip = AudioFileClip(audio_file)
     duration = audio_clip.duration
 
-    # Base video
+    # 2️⃣ Create base video (1280x720) with dark background
     clip = ColorClip(size=(1280, 720), color=(10, 10, 50)).set_duration(duration)
 
-    # Center text
+    # 3️⃣ Center main news text
     main_text = TextClip(segment, fontsize=50, color='white', font='Arial-Bold',
                          method='caption', size=(1100, 500))
     main_text = main_text.set_position('center').set_duration(duration)
 
-    # Scrolling ticker
+    # 4️⃣ Scrolling ticker at bottom
     ticker_text = TextClip(segment + " — " + segment, fontsize=30, color='yellow',
                            font='Arial-Bold', method='caption', size=(3000, 60))
     ticker = ticker_text.set_position(lambda t: (1280 - t*200, 650)).set_duration(duration)
 
-    # Combine
+    # 5️⃣ Combine video + text + ticker + audio
     final_clip = CompositeVideoClip([clip, main_text, ticker])
     final_clip = final_clip.set_audio(audio_clip)
 
     video_clips.append(final_clip)
 
+# ------------------------
 # Concatenate all segments
+# ------------------------
 final_video = concatenate_videoclips(video_clips, method="compose")
-final_video.write_videofile("daily_ai_news_tv.mp4", fps=24, codec="libx264")
+output_file = "daily_ai_news_tv.mp4"
+final_video.write_videofile(output_file, fps=24, codec="libx264")
 
-print("✅ Your news channel style video is ready: daily_ai_news_tv.mp4")
+print(f"✅ Your news channel style video is ready: {output_file}")
