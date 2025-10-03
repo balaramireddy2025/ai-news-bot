@@ -1,30 +1,36 @@
-name: AI News Daily Scheduler
+name: AI News Scheduler
 
 on:
   schedule:
-    - cron: "30 4 * * *"   # 10:00 IST = 4:30 UTC
-  workflow_dispatch:        # allows manual trigger
+    - cron: "30 4 * * *"  # Daily at 04:30 UTC
+  workflow_dispatch:       # Manual trigger
 
 jobs:
-  run-ai-news:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      # Checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up Python
+      # Setup Python
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: "3.12"
 
+      # Install dependencies
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: Run AI News script
-        run: python ai_news_scheduler.py
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      # Optional: Test MoviePy MP4 generation
+      - name: Test MP4 generation
+        run: |
+          python3 -c "from moviepy.editor import TextClip; TextClip('Test', fontsize=50, color='white').write_videofile('test.mp4', fps=24, codec='libx264')"
+
+      # Run AI News Scheduler
+      - name: Run AI News Scheduler
+        run: python3 ai_news_scheduler.py
