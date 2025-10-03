@@ -1,3 +1,5 @@
-requests
-google-generativeai
+feedparser
+beautifulsoup4
 schedule
+google-generativeai
+requests
