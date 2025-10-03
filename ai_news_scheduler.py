@@ -4,114 +4,123 @@ import schedule
 import logging
 from datetime import datetime
 from gtts import gTTS
-from moviepy.editor import TextClip, AudioFileClip, concatenate_videoclips, CompositeVideoClip
-from ai_news import AINewsWorkflow  # 👈 your AI news generator
+from moviepy.editor import (
+    TextClip, AudioFileClip, concatenate_videoclips,
+    CompositeVideoClip, ColorClip
+)
 import requests
 
 # -----------------------------
 # CONFIGURATION
 # -----------------------------
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "your_gemini_api_key_here")
-LINKEDIN_ACCESS_TOKEN = os.getenv("LINKEDIN_ACCESS_TOKEN")
+LINKEDIN_ACCESS_TOKEN = os.getenv("LINKEDIN_ACCESS_TOKEN", None)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "your_telegram_bot_token")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "8042497508")
 VIDEO_OUTPUT_FILE = "daily_ai_news_tv.mp4"
+VIDEO_WIDTH, VIDEO_HEIGHT = 1280, 720
+FONT_SIZE = 40
+DURATION_PER_SLIDE = 8  # seconds
 
 # Logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-# Initialize workflow
-workflow = AINewsWorkflow(
-    GEMINI_API_KEY,
-    LINKEDIN_ACCESS_TOKEN,
-    telegram_bot_token=TELEGRAM_BOT_TOKEN,
-    telegram_chat_id=TELEGRAM_CHAT_ID
-)
+# -----------------------------
+# FAKE AI NEWS WORKFLOW (Replace with your own AI generator)
+# -----------------------------
+class AINewsWorkflow:
+    def __init__(self, api_key, linkedin_token=None, telegram_bot_token=None, telegram_chat_id=None):
+        self.api_key = api_key
+        self.linkedin_token = linkedin_token
+        self.telegram_bot_token = telegram_bot_token
+        self.telegram_chat_id = telegram_chat_id
+
+    def create_daily_ai_news_post(self):
+        # This should be replaced by your real Gemini/AI workflow
+        content = (
+            "🚀 AI for a Greener Tomorrow: Mitti Labs empowers Indian rice farmers.\n\n"
+            "📡 Unlocking New Business Models: China Mobile & Huawei 5G-A demo.\n\n"
+            "💡 Cultivating Next-Gen Innovators: MIT welcomes Ana Bakshi.\n\n"
+            "Actionable insights:\n* Embrace AI for ESG\n* Strategize for 5G-A\n* Invest in ecosystems"
+        )
+        return {
+            'generated_content': type('obj', (object,), {'content': content}),
+            'trending_topics': ['AI startup']
+        }
+
+workflow = AINewsWorkflow(GEMINI_API_KEY, LINKEDIN_ACCESS_TOKEN, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
 
 # -----------------------------
 # VIDEO CREATION FUNCTIONS
 # -----------------------------
 def generate_tts_audio(text, filename="news_audio.mp3"):
-    logger.info("🎤 Generating TTS audio...")
+    logger.info("🔊 Generating TTS audio...")
     tts = gTTS(text=text, lang='en')
     tts.save(filename)
-    logger.info(f"✅ Audio saved as {filename}")
     return filename
 
-def create_news_clip(text, audio_file, width=1280, height=720, fontsize=40, duration_per_slide=8):
+def create_news_clip(text, audio_file, width=VIDEO_WIDTH, height=VIDEO_HEIGHT,
+                      fontsize=FONT_SIZE, duration_per_slide=DURATION_PER_SLIDE):
     paragraphs = [p.strip() for p in text.split("\n") if p.strip()]
     clips = []
 
-    audio = AudioFileClip(audio_file)
-    audio_duration = audio.duration
-    logger.info(f"🎵 Audio duration: {audio_duration:.2f}s")
+    for i, paragraph in enumerate(paragraphs, start=1):
+        logger.info(f"🎬 Creating slide {i}/{len(paragraphs)}: {paragraph[:50]}...")
 
-    for i, paragraph in enumerate(paragraphs):
-        logger.info(f"📝 Creating slide {i+1}/{len(paragraphs)}")
-        # Text clip
-        txt_clip = TextClip(
-            paragraph,
-            fontsize=fontsize,
-            color='white',
-            size=(width-100, None),
-            method='caption'
-        ).set_duration(duration_per_slide).set_position(('center', 'center')).on_color(color=(0,0,0), col_opacity=1)
+        # Background color clip
+        bg_clip = ColorClip(size=(width, height), color=(0, 0, 0), duration=duration_per_slide)
+
+        # Main text clip
+        txt_clip = TextClip(paragraph, fontsize=fontsize, color='white',
+                            size=(width-100, None), method='label')
+        txt_clip = txt_clip.set_position(('center', 'center')).set_duration(duration_per_slide)
 
         # Scrolling ticker at bottom
-        ticker_text = paragraph[:80] + "..." if len(paragraph) > 80 else paragraph
-        ticker_clip = TextClip(ticker_text, fontsize=24, color='yellow', size=(width, 30), method='caption')
-        ticker_clip = ticker_clip.set_duration(duration_per_slide).set_position(('left', height-40)).set_start(0)
+        ticker_text = paragraph[:120] + " ... "  # first 120 chars for ticker
+        ticker_clip = TextClip(ticker_text, fontsize=24, color='yellow', method='label')
+        ticker_clip = ticker_clip.set_position(lambda t: (int(width - t*100) % width, height-50)).set_duration(duration_per_slide)
 
-        # Composite slide
-        clip = CompositeVideoClip([txt_clip, ticker_clip])
-        clips.append(clip)
+        # Composite
+        slide = CompositeVideoClip([bg_clip, txt_clip, ticker_clip])
+        clips.append(slide)
 
-    # Concatenate slides
-    video = concatenate_videoclips(clips, method="compose")
-    # Trim or loop audio to match video length
-    if audio.duration > video.duration:
-        audio = audio.subclip(0, video.duration)
-    else:
-        audio = audio.set_duration(video.duration)
-    video = video.set_audio(audio)
-    logger.info("🎬 Video clip created with audio")
+    # Concatenate all slides
+    final_video = concatenate_videoclips(clips, method="compose")
 
-    return video
+    # Add audio
+    audio = AudioFileClip(audio_file)
+    final_video = final_video.set_audio(audio)
+
+    return final_video
 
 # -----------------------------
 # SCHEDULED JOB
 # -----------------------------
 def job():
     logger.info("⏰ Running AI News workflow...")
-    try:
-        result = workflow.create_daily_ai_news_post()
-        news_content = result['generated_content'].content
-        logger.info("📰 News content generated successfully")
+    result = workflow.create_daily_ai_news_post()
+    news_content = result['generated_content'].content
 
-        # Generate TTS
-        audio_file = generate_tts_audio(news_content, "news_audio.mp3")
+    # Generate audio
+    audio_file = generate_tts_audio(news_content)
 
-        # Create video
-        video = create_news_clip(news_content, audio_file)
-        logger.info(f"💾 Writing video to {VIDEO_OUTPUT_FILE}...")
-        video.write_videofile(VIDEO_OUTPUT_FILE, fps=24, codec="libx264", audio_codec="aac")
-        logger.info(f"✅ Video saved: {VIDEO_OUTPUT_FILE}")
+    # Create video
+    video = create_news_clip(news_content, audio_file)
+    logger.info("💾 Writing MP4 video...")
+    video.write_videofile(VIDEO_OUTPUT_FILE, fps=24, codec='libx264', audio_codec='aac')
+    logger.info(f"✅ Video generated: {VIDEO_OUTPUT_FILE}")
 
-        # Telegram (optional)
-        if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
-            logger.info(f"📤 Sending video to Telegram chat {TELEGRAM_CHAT_ID}...")
-            with open(VIDEO_OUTPUT_FILE, 'rb') as f:
-                files = {'video': f}
-                url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendVideo?chat_id={TELEGRAM_CHAT_ID}"
-                r = requests.post(url, files=files)
-                if r.status_code == 200:
-                    logger.info(f"✅ Video sent to Telegram chat {TELEGRAM_CHAT_ID}")
-                else:
-                    logger.warning(f"❌ Failed to send video: {r.text}")
-
-    except Exception as e:
-        logger.error(f"❌ Job failed: {e}")
+    # Telegram upload
+    if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+        logger.info(f"📤 Sending video to Telegram chat {TELEGRAM_CHAT_ID}...")
+        with open(VIDEO_OUTPUT_FILE, 'rb') as f:
+            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendVideo?chat_id={TELEGRAM_CHAT_ID}"
+            r = requests.post(url, files={'video': f})
+        if r.status_code == 200:
+            logger.info("✅ Video sent successfully to Telegram")
+        else:
+            logger.warning(f"❌ Failed to send video: {r.text}")
 
 # -----------------------------
 # SCHEDULER
@@ -121,4 +130,4 @@ logger.info("📅 Scheduler started. Waiting for 10:00 each day...")
 
 while True:
     schedule.run_pending()
-    time.sleep(60)
+    time.sleep(30)
