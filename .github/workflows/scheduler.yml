@@ -2,35 +2,35 @@ name: AI News Scheduler
 
 on:
   schedule:
-    - cron: "30 4 * * *"  # Daily at 04:30 UTC
-  workflow_dispatch:       # Manual trigger
+    # Runs daily at 4:30 UTC (10:00 AM IST)
+    - cron: "30 4 * * *"
+  workflow_dispatch:
 
 jobs:
-  build:
+  run-ai-news:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout repository
+      # Step 1: Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Setup Python
-      - name: Setup Python
+      # Step 2: Set up Python
+      - name: Set up Python 3.12
         uses: actions/setup-python@v4
         with:
-          python-version: "3.12"
+          python-version: '3.12'
 
-      # Install dependencies
+      # Step 3: Upgrade pip and install dependencies
       - name: Install dependencies
         run: |
-          python3 -m pip install --upgrade pip
-          pip install -r requirements.txt
+          python -m pip install --upgrade pip
+          python -m pip install --no-cache-dir -r requirements.txt
 
-      # Optional: Test MoviePy MP4 generation
-      - name: Test MP4 generation
-        run: |
-          python3 -c "from moviepy.editor import TextClip; TextClip('Test', fontsize=50, color='white').write_videofile('test.mp4', fps=24, codec='libx264')"
+      # Step 4: Debug - verify moviepy installed
+      - name: List installed packages
+        run: python -m pip list
 
-      # Run AI News Scheduler
+      # Step 5: Run the AI News Scheduler
       - name: Run AI News Scheduler
-        run: python3 ai_news_scheduler.py
+        run: python ai_news_scheduler.py
