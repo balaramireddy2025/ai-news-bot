@@ -3,7 +3,7 @@
 # ================================================
 
 # Step 1: Install required packages
-!pip install -q feedparser beautifulsoup4 schedule google-generativeai requests
+# !pip install -q feedparser beautifulsoup4 schedule google-generativeai requests
 
 # Step 2: Import libraries
 import os
@@ -15,6 +15,7 @@ from typing import List, Dict
 import google.generativeai as genai
 from dataclasses import dataclass
 import logging
+import feedparser
 
 # Optional news packages
 try:
