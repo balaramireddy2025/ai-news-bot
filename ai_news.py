@@ -3,7 +3,6 @@
 # ================================================
 
 # Step 1: Install required packages
-# !pip install -q feedparser beautifulsoup4 schedule google-generativeai requests
 
 # Step 2: Import libraries
 import os
