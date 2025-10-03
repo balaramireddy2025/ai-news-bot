@@ -1,8 +1,8 @@
-feedparser
-beautifulsoup4
-schedule
-google-generativeai
-requests
-gtts
+feedparser==6.0.12
+beautifulsoup4==4.14.2
+schedule==1.2.2
+google-generativeai==0.8.5
+requests==2.32.5
+gtts==2.3.2
 moviepy==2.1.1
 imageio[ffmpeg]==2.31.1
