@@ -46,8 +46,9 @@ duration = 15  # seconds
 num_frames = fps * duration
 
 # Prepare video writer
-output_file = f"ai_news_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
-fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+output_file = f"temp_ai_news_video.mp4" # Use a temp name for the initial video
+# Use 'mp4v' or another available FOURCC. The subsequent FFmpeg step will re-encode.
+fourcc = cv2.VideoWriter_fourcc(*'mp4v') 
 video_writer = cv2.VideoWriter(output_file, fourcc, fps, (width, height))
 
 # Prepare text for frames
@@ -68,24 +69,33 @@ for _ in range(num_frames):
 video_writer.release()
 
 # ------------------------------
-# Merge audio using FFmpeg
+# Merge and re-encode audio/video using FFmpeg for compatibility
 # ------------------------------
-final_output = f"final_{output_file}"
+final_output = f"ai_news_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
+# Explicitly re-encode video to H.264 (libx264) and audio to AAC
 subprocess.run([
     'ffmpeg', '-y',
-    '-i', output_file,
-    '-i', audio_file,
-    '-c:v', 'copy',
-    '-c:a', 'aac',
-    '-strict', 'experimental',
+    '-i', output_file, # Input video (from OpenCV)
+    '-i', audio_file,  # Input audio (from gTTS)
+    '-c:v', 'libx264', # Encode video to H.264
+    '-preset', 'veryfast', # A good balance of speed and quality
+    '-pix_fmt', 'yuv420p', # Standard pixel format for compatibility
+    '-c:a', 'aac',     # Encode audio to AAC
+    '-b:a', '192k',    # Audio bitrate
+    '-shortest',       # Finish encoding when the shortest input stream ends
     final_output
 ], check=True)
+
+# Clean up temporary video file
+os.remove(output_file)
 
 # ------------------------------
 # Send video to Telegram
 # ------------------------------
 with open(final_output, "rb") as f:
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendVideo"
-    requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID}, files={"video": f})
+    # Added a caption for better UX on Telegram
+    caption = f"AI News Daily - {datetime.now().strftime('%Y-%m-%d')}"
+    requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID, "caption": caption}, files={"video": f})
 
-print(f"✅ Video generated and sent to Telegram: {final_output}")
+print(f"✅ Video generated, re-encoded, and sent to Telegram: {final_output}")
