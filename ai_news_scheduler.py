@@ -1,110 +1,91 @@
 import os
 import cv2
 import numpy as np
-import requests
 from gtts import gTTS
-from datetime import datetime
+import requests
 import subprocess
-import importlib.metadata
+from datetime import datetime
 
-# -----------------------------
-# Dependency Check
-# -----------------------------
-print("Checking dependencies...")
-print(f"✅ OpenCV version: {cv2.__version__}")
-print(f"✅ NumPy version: {np.__version__}")
-
+# ------------------------------
+# Quick FFmpeg check
+# ------------------------------
 try:
-    gtts_version = importlib.metadata.version("gTTS")
-    print(f"✅ gTTS version: {gtts_version}")
-except importlib.metadata.PackageNotFoundError:
-    print("❌ gTTS package not found. Please install it.")
-    raise SystemExit(1)
+    subprocess.run(['ffmpeg', '-version'], check=True)
+except FileNotFoundError:
+    raise SystemExit("FFmpeg not installed or not in PATH.")
 
-try:
-    subprocess.run(["ffmpeg", "-version"], check=True, capture_output=True)
-    print("✅ FFmpeg is installed")
-except Exception:
-    print("❌ FFmpeg not found. Please install FFmpeg.")
-    raise SystemExit(1)
-
-# -----------------------------
-# Telegram Config
-# -----------------------------
+# ------------------------------
+# Telegram config
+# ------------------------------
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
 if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-    print("❌ Telegram credentials missing in environment variables.")
-    raise SystemExit(1)
+    raise SystemExit("Telegram token or chat ID not set in environment.")
 
-# -----------------------------
-# AI News Content
-# -----------------------------
+# ------------------------------
+# AI News content (placeholder)
+# ------------------------------
 news_text = """
 AI is transforming the world: sustainability, 5G-A networks, and entrepreneurship are key areas to watch.
 """
 
-# -----------------------------
-# Convert Text to Speech
-# -----------------------------
-tts = gTTS(text=news_text, lang="en")
+# ------------------------------
+# Convert text to speech
+# ------------------------------
 audio_file = "news.mp3"
+tts = gTTS(text=news_text, lang="en")
 tts.save(audio_file)
 
-# -----------------------------
-# Create Video Frames using OpenCV
-# -----------------------------
+# ------------------------------
+# Create video with OpenCV
+# ------------------------------
 width, height = 1280, 720
-font = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 1
-font_color = (255, 255, 255)
-line_type = 2
-duration_sec = 15
 fps = 24
-total_frames = duration_sec * fps
+duration = 15  # seconds
+num_frames = fps * duration
 
-# Split text into lines
-lines = news_text.strip().split("\n")
-line_y = height // 2 - (len(lines) * 30)
-
-video_file = f"ai_news_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
+# Prepare video writer
+output_file = f"ai_news_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-video_writer = cv2.VideoWriter("temp_video.mp4", fourcc, fps, (width, height))
+video_writer = cv2.VideoWriter(output_file, fourcc, fps, (width, height))
 
-for _ in range(total_frames):
-    frame = np.zeros((height, width, 3), dtype=np.uint8)
-    y = line_y
-    for line in lines:
-        text_size = cv2.getTextSize(line, font, font_scale, line_type)[0]
-        x = (width - text_size[0]) // 2
-        cv2.putText(frame, line, (x, y), font, font_scale, font_color, line_type, cv2.LINE_AA)
-        y += 50
+# Prepare text for frames
+font = cv2.FONT_HERSHEY_SIMPLEX
+font_scale = 1.5
+color = (255, 255, 255)
+thickness = 2
+bg_color = (0, 0, 0)
+
+for _ in range(num_frames):
+    frame = np.full((height, width, 3), bg_color, dtype=np.uint8)
+    y0, dy = height // 2, 50
+    for i, line in enumerate(news_text.strip().split('\n')):
+        y = y0 + i * dy
+        cv2.putText(frame, line, (50, y), font, font_scale, color, thickness, cv2.LINE_AA)
     video_writer.write(frame)
 
 video_writer.release()
 
-# -----------------------------
-# Combine video and audio using FFmpeg
-# -----------------------------
-ffmpeg_command = [
-    "ffmpeg",
-    "-y",
-    "-i", "temp_video.mp4",
-    "-i", audio_file,
-    "-c:v", "libx264",
-    "-c:a", "aac",
-    "-shortest",
-    video_file
-]
+# ------------------------------
+# Merge audio using FFmpeg
+# ------------------------------
+final_output = f"final_{output_file}"
+subprocess.run([
+    'ffmpeg', '-y',
+    '-i', output_file,
+    '-i', audio_file,
+    '-c:v', 'copy',
+    '-c:a', 'aac',
+    '-strict', 'experimental',
+    final_output
+], check=True)
 
-subprocess.run(ffmpeg_command, check=True)
-
-# -----------------------------
+# ------------------------------
 # Send video to Telegram
-# -----------------------------
-with open(video_file, "rb") as f:
+# ------------------------------
+with open(final_output, "rb") as f:
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendVideo"
     requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID}, files={"video": f})
 
-print(f"✅ MP4 generated and sent to Telegram: {video_file}")
+print(f"✅ Video generated and sent to Telegram: {final_output}")
