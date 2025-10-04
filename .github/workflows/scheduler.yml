@@ -30,19 +30,25 @@ jobs:
 
       - name: Check dependencies before running
         run: |
-          python -c "
-import cv2, numpy, requests, subprocess, importlib.metadata
+          python - <<'EOF'
+import cv2
+import numpy
+import requests
+import subprocess
+import importlib.metadata
+
 try:
     gtts_version = importlib.metadata.version('gTTS')
 except importlib.metadata.PackageNotFoundError:
     raise SystemExit('gTTS not installed')
+
 print(f'OpenCV {cv2.__version__}, NumPy {numpy.__version__}, gTTS {gtts_version}')
+
 subprocess.run(['ffmpeg', '-version'], check=True)
-"
+EOF
 
       - name: Run AI News Scheduler
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          python ai_news_scheduler.py
+        run: python ai_news_scheduler.py
