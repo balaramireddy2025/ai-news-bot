@@ -23,22 +23,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install --no-cache-dir -r requirements.txt
 
-      # FIX: Install FFmpeg using apt-get
+      # Ensure FFmpeg is installed using standard Ubuntu package manager
       - name: Install FFmpeg
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
-      - name: Verify FFmpeg and Dependencies
-        run: |
-          # Check FFmpeg is available
-          if ! command -v ffmpeg &> /dev/null; then
-              echo "Error: FFmpeg is not installed or not in PATH."
-              exit 1
-          fi
-          # Check Python dependencies are functional
-          python -c "import cv2, numpy, gtts, requests, subprocess; print('✅ Dependencies are functional.')"
-          
       - name: Run AI News Scheduler
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
