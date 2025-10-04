@@ -23,31 +23,32 @@ jobs:
           python -m pip install --upgrade pip
           pip install --no-cache-dir -r requirements.txt
 
-      - name: Check dependencies before running
+      # FIX: Replaced shell here-document (<<EOF) with a robust multi-line execution.
+      - name: Check Python Dependencies and FFmpeg Availability
         run: |
-          python - <<EOF
+          python -c "
 import cv2
 import numpy
 import requests
 import subprocess
 import importlib.metadata
+from sys import exit
 
 # Check gTTS version
 try:
     gtts_version = importlib.metadata.version('gTTS')
 except importlib.metadata.PackageNotFoundError:
-    raise SystemExit('gTTS not installed')
+    exit('gTTS not installed')
 
 # Print versions
 print(f'OpenCV {cv2.__version__}, NumPy {numpy.__version__}, gTTS {gtts_version}')
 
 # Check FFmpeg
 try:
-    subprocess.run(['ffmpeg', '-version'], check=True)
+    subprocess.run(['ffmpeg', '-version'], check=True, stdout=subprocess.DEVNULL)
 except FileNotFoundError:
-    raise SystemExit('FFmpeg not found. Please install FFmpeg.')
-EOF
-
+    exit('FFmpeg not found. Please ensure it is installed on the runner.')
+"
       - name: Run AI News Scheduler
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
