@@ -7,6 +7,7 @@ import subprocess
 from datetime import datetime
 import time 
 import sys
+import re # Import regex for HTML stripping
 
 # ------------------------------
 # Quick FFmpeg check
@@ -26,35 +27,36 @@ if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
     sys.exit("Telegram token or chat ID not set in environment.")
 
 # ------------------------------
-# AI News content (EXPAND THIS BLOCK FOR LONGER MESSAGES/AUDIO)
+# AI News content (Using HTML tags for robust Telegram posting)
 # ------------------------------
 news_text = """
 🔔 AI News Daily - Your update for today! 🔔
 
-**HEADLINE: AI Innovation Drives Global Sustainability Efforts**
+<b>HEADLINE: AI Innovation Drives Global Sustainability Efforts</b>
 
 Artificial intelligence is rapidly becoming a cornerstone of global efforts to combat climate change and enhance sustainability. Recent developments show AI being deployed across multiple sectors to optimize resource allocation, reduce waste, and improve prediction models.
 
-* **Energy Optimization:** In the energy sector, AI algorithms are managing smart grids, predicting energy demand with unprecedented accuracy, and dynamically adjusting renewable energy sources like solar and wind farms to maximize efficiency. This alone is projected to cut carbon emissions by 15% in pilot cities.
-* **5G-A Networks:** The rollout of 5G-Advanced (5G-A) networks is also leveraging AI to fine-tune network performance, making connectivity more efficient and consuming less power per gigabyte of data transferred. This is crucial for enabling the IoT devices that power many smart city sustainability projects.
-* **Entrepreneurship and AI:** A new wave of startups is utilizing large language models and computer vision to tackle environmental issues, such as monitoring deforestation in real-time and automating the sorting of complex recyclables. This blend of AI and entrepreneurship is fueling rapid innovation in areas previously limited by manual labor.
+- Energy Optimization: In the energy sector, AI algorithms are managing smart grids, predicting energy demand with unprecedented accuracy, and dynamically adjusting renewable energy sources like solar and wind farms to maximize efficiency. This alone is projected to cut carbon emissions by 15% in pilot cities.
+- 5G-A Networks: The rollout of 5G-Advanced (5G-A) networks is also leveraging AI to fine-tune network performance, making connectivity more efficient and consuming less power per gigabyte of data transferred. This is crucial for enabling the IoT devices that power many smart city sustainability projects.
+- Entrepreneurship and AI: A new wave of startups is utilizing large language models and computer vision to tackle environmental issues, such as monitoring deforestation in real-time and automating the sorting of complex recyclables. This blend of AI and entrepreneurship is fueling rapid innovation in areas previously limited by manual labor.
 
 Watch the video report below for the full story!
 """
+# Helper function to strip HTML tags
+def strip_html(text):
+    return re.sub(r'<[^>]*?>', '', text)
 
 # ------------------------------
 # Convert text to speech
 # ------------------------------
 audio_file = "news.mp3"
-# Use clean text for gTTS generation (we exclude the last line and the bold/markdown characters for better audio generation)
 gtts_text_lines = news_text.splitlines()
 # Exclude the final "Watch the video report..." line
 gtts_text = "\n".join(gtts_text_lines[:-1]).strip()
-# Clean up markdown for gTTS
-gtts_text = gtts_text.replace("*", "").replace(":", ".").replace("-", " ")
+# Clean up HTML/Markdown for gTTS and replace bullet points with newlines
+gtts_text = strip_html(gtts_text).replace("-", "\n")
 
-# The current text will be much longer, generating a significantly longer audio file (e.g., 40-60 seconds)
-# NOTE: The resulting MP3 will be clipped to the first 15 seconds by the video duration, but the video will use the first 15 seconds of the audio.
+# NOTE: The resulting MP3 will be clipped to the first 15 seconds by the video duration.
 tts = gTTS(text=gtts_text, lang="en")
 tts.save(audio_file)
 
@@ -72,16 +74,17 @@ fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 video_writer = cv2.VideoWriter(temp_output_file, fourcc, fps, (width, height))
 
 font = cv2.FONT_HERSHEY_SIMPLEX
-font_scale = 1.0 # Reduced font scale slightly for longer text to fit
+font_scale = 1.0 
 color = (255, 255, 255)
 thickness = 2
 bg_color = (0, 0, 0)
-# Use the full news_text for the visual display, but clean the markdown for better display
-visual_text = news_text.replace("**", "")
+
+# Use the full, clean text for the visual display
+visual_text = strip_html(news_text)
 
 for _ in range(num_frames):
     frame = np.full((height, width, 3), bg_color, dtype=np.uint8)
-    y0, dy = height // 2, 40 # Reduced line spacing slightly
+    y0, dy = height // 2, 40 
     
     # Render the text
     lines = visual_text.strip().split('\n')
@@ -127,7 +130,7 @@ text_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
 response = requests.post(text_url, data={
     "chat_id": TELEGRAM_CHAT_ID, 
     "text": news_text,
-    "parse_mode": "Markdown" 
+    "parse_mode": "HTML" # <-- CRITICAL FIX: Changed to HTML to fix parsing error
 })
 
 if response.status_code == 200:
