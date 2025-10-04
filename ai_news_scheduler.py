@@ -10,7 +10,8 @@ from datetime import datetime
 # Quick FFmpeg check
 # ------------------------------
 try:
-    subprocess.run(['ffmpeg', '-version'], check=True)
+    # Use DEVNULL to suppress output, keeping the check clean
+    subprocess.run(['ffmpeg', '-version'], check=True, stdout=subprocess.DEVNULL)
 except FileNotFoundError:
     raise SystemExit("FFmpeg not installed or not in PATH.")
 
@@ -26,6 +27,7 @@ if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
 # ------------------------------
 # AI News content (placeholder)
 # ------------------------------
+# The script will now handle dynamic news content generation here
 news_text = """
 AI is transforming the world: sustainability, 5G-A networks, and entrepreneurship are key areas to watch.
 """
@@ -42,12 +44,13 @@ tts.save(audio_file)
 # ------------------------------
 width, height = 1280, 720
 fps = 24
-duration = 15  # seconds
+# Determine duration based on audio file length (placeholder: using a fixed duration)
+duration = 15  # seconds (This should be adjusted to match audio length in a production script)
 num_frames = fps * duration
 
 # Prepare video writer
-output_file = f"temp_ai_news_video.mp4" # Use a temp name for the initial video
-# Use 'mp4v' or another available FOURCC. The subsequent FFmpeg step will re-encode.
+output_file = f"temp_ai_news_video.mp4" 
+# Use 'mp4v' for the intermediate video. The next step will re-encode.
 fourcc = cv2.VideoWriter_fourcc(*'mp4v') 
 video_writer = cv2.VideoWriter(output_file, fourcc, fps, (width, height))
 
@@ -62,6 +65,7 @@ for _ in range(num_frames):
     frame = np.full((height, width, 3), bg_color, dtype=np.uint8)
     y0, dy = height // 2, 50
     for i, line in enumerate(news_text.strip().split('\n')):
+        # Simple text drawing - consider multi-line rendering for long text
         y = y0 + i * dy
         cv2.putText(frame, line, (50, y), font, font_scale, color, thickness, cv2.LINE_AA)
     video_writer.write(frame)
@@ -77,25 +81,26 @@ subprocess.run([
     'ffmpeg', '-y',
     '-i', output_file, # Input video (from OpenCV)
     '-i', audio_file,  # Input audio (from gTTS)
-    '-c:v', 'libx264', # Encode video to H.264
-    '-preset', 'veryfast', # A good balance of speed and quality
-    '-pix_fmt', 'yuv420p', # Standard pixel format for compatibility
-    '-c:a', 'aac',     # Encode audio to AAC
+    '-c:v', 'libx264', # Encode video to H.264 (robust codec)
+    '-preset', 'veryfast', # Faster encoding speed
+    '-pix_fmt', 'yuv420p', # Standard pixel format for maximum compatibility
+    '-c:a', 'aac',     # Encode audio to AAC (standard for MP4)
     '-b:a', '192k',    # Audio bitrate
-    '-shortest',       # Finish encoding when the shortest input stream ends
+    '-shortest',       # Finish encoding when the shortest input stream (usually audio) ends
     final_output
 ], check=True)
 
 # Clean up temporary video file
 os.remove(output_file)
+os.remove(audio_file)
 
 # ------------------------------
 # Send video to Telegram
 # ------------------------------
 with open(final_output, "rb") as f:
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendVideo"
-    # Added a caption for better UX on Telegram
     caption = f"AI News Daily - {datetime.now().strftime('%Y-%m-%d')}"
+    # Requests will automatically use multipart/form-data for files
     requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID, "caption": caption}, files={"video": f})
 
 print(f"✅ Video generated, re-encoded, and sent to Telegram: {final_output}")
