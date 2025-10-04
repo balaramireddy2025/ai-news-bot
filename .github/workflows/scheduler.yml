@@ -1,8 +1,8 @@
-name: AI News Daily Scheduler
+name: AI News Scheduler
 
 on:
   schedule:
-    - cron: "40 4 * * *"  # Every day at 04:40 UTC
+    - cron: "30 4 * * *"  # every day at 04:30 UTC
   workflow_dispatch:
 
 jobs:
@@ -10,28 +10,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v3
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: 3.11
 
       - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
-      - name: Install Python packages
-        run: |
-          python -m pip install --upgrade pip
-          pip install gTTS==2.3.1 opencv-python==4.8.0.76 numpy requests
+      - name: Install Python dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
 
-      - name: Check dependencies before running
+      - name: Dependency check
         run: |
-          python -c "import cv2, gtts, numpy, requests; import subprocess; subprocess.run(['ffmpeg', '-version'], check=True)"
-      
+          python -c "import cv2, numpy, gtts, requests; import subprocess; subprocess.run(['ffmpeg','-version'], check=True)"
+        
       - name: Run AI News Scheduler
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
