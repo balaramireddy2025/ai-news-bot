@@ -1,82 +1,101 @@
 import os
-import sys
+import cv2
+import numpy as np
+from gtts import gTTS
+import requests
 import subprocess
 from datetime import datetime
 
-# Dependency check
+# ------------------------------
+# Quick FFmpeg check
+# ------------------------------
 try:
-    import cv2
-    import numpy as np
-    import requests
-    from gtts import gTTS
-except ImportError as e:
-    print(f"❌ Missing Python package: {e.name}")
-    sys.exit(1)
-
-print(f"✅ Python packages loaded successfully:")
-print(f"   OpenCV version: {cv2.__version__}")
-print(f"   NumPy version: {np.__version__}")
-print(f"   gTTS version: {gTTS.__version__}")
-print(f"   requests version: {requests.__version__}")
-
-# Check FFmpeg
-try:
-    result = subprocess.run(["ffmpeg", "-version"], check=True, capture_output=True, text=True)
-    print("✅ FFmpeg is installed:")
-    print(result.stdout.splitlines()[0])
+    subprocess.run(['ffmpeg', '-version'], check=True)
 except FileNotFoundError:
-    print("❌ FFmpeg is not installed or not in PATH")
-    sys.exit(1)
+    raise SystemExit("FFmpeg not installed or not in PATH.")
 
+# ------------------------------
 # Telegram config
+# ------------------------------
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+
 if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-    print("❌ TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set")
-    sys.exit(1)
+    raise SystemExit("Telegram token or chat ID not set in environment.")
 
-# News text
-news_text = "AI is transforming the world: sustainability, 5G-A networks, and entrepreneurship are key areas to watch."
+# ------------------------------
+# AI News content (placeholder)
+# ------------------------------
+news_text = """
+AI is transforming the world: sustainability, 5G-A networks, and entrepreneurship are key areas to watch.
+"""
 
+# ------------------------------
 # Convert text to speech
+# ------------------------------
 audio_file = "news.mp3"
 tts = gTTS(text=news_text, lang="en")
 tts.save(audio_file)
 
-# Create video frames
+# ------------------------------
+# Create video with OpenCV
+# ------------------------------
 width, height = 1280, 720
 fps = 24
-duration = 10
+duration = 15  # seconds
 num_frames = fps * duration
 
-fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-video_file = f"ai_news_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
-out = cv2.VideoWriter(video_file, fourcc, fps, (width, height))
+# Prepare video writer
+output_file = f"temp_ai_news_video.mp4" # Use a temp name for the initial video
+# Use 'mp4v' or another available FOURCC. The subsequent FFmpeg step will re-encode.
+fourcc = cv2.VideoWriter_fourcc(*'mp4v') 
+video_writer = cv2.VideoWriter(output_file, fourcc, fps, (width, height))
 
-for i in range(num_frames):
-    frame = np.zeros((height, width, 3), dtype=np.uint8)
-    cv2.putText(frame, news_text, (50, height // 2), cv2.FONT_HERSHEY_SIMPLEX,
-                1, (255, 255, 255), 2, cv2.LINE_AA)
-    out.write(frame)
+# Prepare text for frames
+font = cv2.FONT_HERSHEY_SIMPLEX
+font_scale = 1.5
+color = (255, 255, 255)
+thickness = 2
+bg_color = (0, 0, 0)
 
-out.release()
+for _ in range(num_frames):
+    frame = np.full((height, width, 3), bg_color, dtype=np.uint8)
+    y0, dy = height // 2, 50
+    for i, line in enumerate(news_text.strip().split('\n')):
+        y = y0 + i * dy
+        cv2.putText(frame, line, (50, y), font, font_scale, color, thickness, cv2.LINE_AA)
+    video_writer.write(frame)
 
-# Add audio using FFmpeg
-final_output = f"final_{video_file}"
-cmd = [
-    "ffmpeg", "-y",
-    "-i", video_file,
-    "-i", audio_file,
-    "-c:v", "copy",
-    "-c:a", "aac",
-    "-shortest",
+video_writer.release()
+
+# ------------------------------
+# Merge and re-encode audio/video using FFmpeg for compatibility
+# ------------------------------
+final_output = f"ai_news_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
+# Explicitly re-encode video to H.264 (libx264) and audio to AAC
+subprocess.run([
+    'ffmpeg', '-y',
+    '-i', output_file, # Input video (from OpenCV)
+    '-i', audio_file,  # Input audio (from gTTS)
+    '-c:v', 'libx264', # Encode video to H.264
+    '-preset', 'veryfast', # A good balance of speed and quality
+    '-pix_fmt', 'yuv420p', # Standard pixel format for compatibility
+    '-c:a', 'aac',     # Encode audio to AAC
+    '-b:a', '192k',    # Audio bitrate
+    '-shortest',       # Finish encoding when the shortest input stream ends
     final_output
-]
-subprocess.run(cmd, check=True)
+], check=True)
 
-# Send to Telegram
+# Clean up temporary video file
+os.remove(output_file)
+
+# ------------------------------
+# Send video to Telegram
+# ------------------------------
 with open(final_output, "rb") as f:
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendVideo"
-    requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID}, files={"video": f})
+    # Added a caption for better UX on Telegram
+    caption = f"AI News Daily - {datetime.now().strftime('%Y-%m-%d')}"
+    requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID, "caption": caption}, files={"video": f})
 
-print(f"✅ Video generated and sent to Telegram: {final_output}")
+print(f"✅ Video generated, re-encoded, and sent to Telegram: {final_output}")
