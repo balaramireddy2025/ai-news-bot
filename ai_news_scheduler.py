@@ -10,34 +10,36 @@ def install_package(pkg):
     print(f"🔧 Installing missing package: {pkg} ...")
     subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
 
-# Check for moviepy
-try:
-    from moviepy.editor import TextClip, CompositeVideoClip, concatenate_videoclips, AudioFileClip
-except ImportError:
-    install_package("moviepy==1.0.3")
-    from moviepy.editor import TextClip, CompositeVideoClip, concatenate_videoclips, AudioFileClip
+def ensure_package(pkg, import_name=None, version=None):
+    """Check and import a package, install if missing."""
+    try:
+        if import_name:
+            __import__(import_name)
+        else:
+            __import__(pkg)
+    except ImportError:
+        dep = f"{pkg}=={version}" if version else pkg
+        install_package(dep)
 
-# Check for requests
-try:
-    import requests
-except ImportError:
-    install_package("requests==2.31.0")
-    import requests
+# Ensure dependencies
+ensure_package("moviepy", "moviepy", "1.0.3")
+ensure_package("requests", "requests", "2.31.0")
+ensure_package("python-dotenv", "dotenv", "1.0.0")
 
-# Check for dotenv
-try:
-    from dotenv import load_dotenv
-except ImportError:
-    install_package("python-dotenv==1.0.0")
-    from dotenv import load_dotenv
+# Now import AFTER ensuring they exist
+from moviepy.editor import TextClip, CompositeVideoClip, concatenate_videoclips, AudioFileClip
+import requests
+from dotenv import load_dotenv
 
-# Check ffmpeg availability
+# -----------------------------
+# ffmpeg check
+# -----------------------------
 def check_ffmpeg():
     try:
         subprocess.run(["ffmpeg", "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
         print("✅ ffmpeg is available")
     except Exception:
-        print("⚠️ ffmpeg not found, trying to install...")
+        print("⚠️ ffmpeg not found, installing...")
         subprocess.check_call(["sudo", "apt-get", "update"])
         subprocess.check_call(["sudo", "apt-get", "install", "-y", "ffmpeg"])
 
@@ -59,8 +61,7 @@ def send_message(message):
     print("📨 Telegram response:", response.text)
 
 def main():
-    # Example placeholder - replace with your real news fetching/AI logic
-    news_headline = "📰 Today's AI News: MoviePy now auto-installs in your bot! 🚀"
+    news_headline = "📰 Today's AI News: MoviePy is now auto-installed before import! 🚀"
     send_message(news_headline)
 
 if __name__ == "__main__":
