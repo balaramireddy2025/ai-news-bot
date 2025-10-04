@@ -5,16 +5,16 @@ from gtts import gTTS
 import requests
 import subprocess
 from datetime import datetime
-import time # Keep time for a small pause between messages
+import time 
+import sys # Import sys to exit on critical error
 
 # ------------------------------
-# Quick FFmpeg check
+# Quick FFmpeg check (We exit if it fails)
 # ------------------------------
 try:
-    # Use DEVNULL to suppress output, keeping the check clean
     subprocess.run(['ffmpeg', '-version'], check=True, stdout=subprocess.DEVNULL)
 except FileNotFoundError:
-    raise SystemExit("FFmpeg not installed or not in PATH.")
+    sys.exit("FFmpeg not installed or not in PATH. Check scheduler.yml.")
 
 # ------------------------------
 # Telegram config
@@ -23,7 +23,7 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
 if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-    raise SystemExit("Telegram token or chat ID not set in environment.")
+    sys.exit("Telegram token or chat ID not set in environment.")
 
 # ------------------------------
 # AI News content
@@ -33,15 +33,14 @@ news_text = """
 
 AI is transforming the world: sustainability, 5G-A networks, and entrepreneurship are key areas to watch.
 
-(The full video report is below. Listen for the full voice narration!)
+Watch the video report below for the full story!
 """
 
 # ------------------------------
 # Convert text to speech (Using gTTS for now)
 # ------------------------------
 audio_file = "news.mp3"
-# Use clean text for gTTS generation
-gtts_text = news_text.replace("(The full video report is below. Listen for the full voice narration!)", "").strip() 
+gtts_text = news_text.replace("Watch the video report below for the full story!", "").strip() 
 tts = gTTS(text=gtts_text, lang="en")
 tts.save(audio_file)
 
@@ -50,23 +49,19 @@ tts.save(audio_file)
 # ------------------------------
 width, height = 1280, 720
 fps = 24
-# Set a fixed duration to ensure the text screen stays visible
-duration = 15  # seconds
+duration = 15  # seconds - FORCED DURATION
 num_frames = fps * duration
 
-# Prepare video writer
 output_file = f"temp_ai_news_video.mp4" 
-# Use 'mp4v' for the intermediate video. The next step will re-encode.
 fourcc = cv2.VideoWriter_fourcc(*'mp4v') 
 video_writer = cv2.VideoWriter(output_file, fourcc, fps, (width, height))
 
-# Prepare text for frames
 font = cv2.FONT_HERSHEY_SIMPLEX
 font_scale = 1.5
 color = (255, 255, 255)
 thickness = 2
 bg_color = (0, 0, 0)
-display_text = gtts_text # Text to display on video is the TTS text
+display_text = gtts_text
 
 for _ in range(num_frames):
     frame = np.full((height, width, 3), bg_color, dtype=np.uint8)
@@ -75,8 +70,7 @@ for _ in range(num_frames):
     # Render the text
     lines = display_text.split('\n')
     for i, line in enumerate(lines):
-        if line.strip(): # Skip empty lines
-            # Calculate position relative to the center
+        if line.strip():
             y = y0 + i * dy - (len(lines) * dy // 2)
             cv2.putText(frame, line.strip(), (50, y), font, font_scale, color, thickness, cv2.LINE_AA)
             
@@ -85,10 +79,11 @@ for _ in range(num_frames):
 video_writer.release()
 
 # ------------------------------
-# Merge and re-encode audio/video using FFmpeg for compatibility
-# We REMOVE the -shortest flag to force the video to the full 15 seconds
+# Merge and re-encode audio/video using FFmpeg
+# ENSURE duration is set, and -shortest is NOT used.
 # ------------------------------
 final_output = f"ai_news_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
+print(f"Starting FFmpeg to create a {duration}-second video...")
 
 subprocess.run([
     'ffmpeg', '-y',
@@ -99,33 +94,36 @@ subprocess.run([
     '-pix_fmt', 'yuv420p',
     '-c:a', 'aac',
     '-b:a', '192k',
-    # '-shortest', <--- REMOVED: This forces video duration to match audio (which is short)
-    '-t', str(duration), # Add duration command to ensure the video is the full length
+    '-t', str(duration), # <-- FORCES DURATION TO 15 SECONDS
     final_output
 ], check=True)
 
-# Clean up temporary video file
+print(f"✅ Video created: {final_output}")
 os.remove(output_file)
 
 # ------------------------------
-# 1. Send TEXT MESSAGE to Telegram
+# 1. Send TEXT MESSAGE to Telegram with robust error logging
 # ------------------------------
-print("Sending text message to Telegram...")
+print("--- Attempting to send text message to Telegram... ---")
 text_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
 response = requests.post(text_url, data={
     "chat_id": TELEGRAM_CHAT_ID, 
-    "text": news_text, # Send the full text
+    "text": news_text,
     "parse_mode": "Markdown"
 })
-if response.status_code != 200:
-    print(f"Error sending text message: {response.text}")
+
+if response.status_code == 200:
+    print("✅ Text message sent successfully.")
+else:
+    print(f"❌ Error sending text message. Status Code: {response.status_code}")
+    print(f"Response: {response.text}") # Print full response for debugging
 
 time.sleep(1) # Pause to ensure the text message posts first
 
 # ------------------------------
-# 2. Send VIDEO to Telegram
+# 2. Send VIDEO to Telegram with robust error logging
 # ------------------------------
-print("Sending video to Telegram...")
+print("--- Attempting to send video to Telegram... ---")
 with open(final_output, "rb") as f:
     video_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendVideo"
     video_caption = f"Full AI News Report - {datetime.now().strftime('%Y-%m-%d')}"
@@ -135,10 +133,12 @@ with open(final_output, "rb") as f:
         "caption": video_caption
     }, files={"video": f})
 
-if response.status_code != 200:
-    print(f"Error sending video: {response.text}")
+if response.status_code == 200:
+    print(f"✅ Video sent successfully.")
+else:
+    print(f"❌ Error sending video. Status Code: {response.status_code}")
+    print(f"Response: {response.text}") # Print full response for debugging
 
-print(f"✅ Text message and video successfully processed: {final_output}")
 
 # Final cleanup
 os.remove(final_output)
