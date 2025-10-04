@@ -30,7 +30,7 @@ jobs:
 
       - name: Check dependencies before running
         run: |
-          python - <<'EOF'
+          python - <<EOF
 import cv2
 import numpy
 import requests
