@@ -1,15 +1,14 @@
 import os
 import cv2
 import numpy as np
-# NOTE: gTTS is still required by requirements.txt but not used for audio generation
-# from gtts import gTTS 
+from gtts import gTTS
 import requests
 import subprocess
 from datetime import datetime
-import time # Import time for a small pause between messages
+import time # Keep time for a small pause between messages
 
 # ------------------------------
-# Quick FFmpeg check (Remains for verification, even though we install it now)
+# Quick FFmpeg check
 # ------------------------------
 try:
     # Use DEVNULL to suppress output, keeping the check clean
@@ -34,45 +33,30 @@ news_text = """
 
 AI is transforming the world: sustainability, 5G-A networks, and entrepreneurship are key areas to watch.
 
-(The full video is below!)
+(The full video report is below. Listen for the full voice narration!)
 """
 
 # ------------------------------
-# Audio setup (USING YOUR PRE-RECORDED FILE)
+# Convert text to speech (Using gTTS for now)
 # ------------------------------
-# *** IMPORTANT: Make sure this file exists in your repository root ***
-audio_file = "my_news_narration.mp3" 
-
-if not os.path.exists(audio_file):
-    # FALLBACK: If the user hasn't provided their voice, use gTTS
-    print(f"⚠️ Custom audio file '{audio_file}' not found. Falling back to gTTS.")
-    from gtts import gTTS
-    gtts_text = news_text.replace("(The full video is below!)", "").strip() # Use clean text for gTTS
-    tts = gTTS(text=gtts_text, lang="en")
-    tts.save(audio_file)
+audio_file = "news.mp3"
+# Use clean text for gTTS generation
+gtts_text = news_text.replace("(The full video report is below. Listen for the full voice narration!)", "").strip() 
+tts = gTTS(text=gtts_text, lang="en")
+tts.save(audio_file)
 
 # ------------------------------
 # Create video with OpenCV
-# We need to find the actual duration of the audio file here
 # ------------------------------
-try:
-    # Use ffprobe to get audio duration (more reliable than fixed 15s)
-    result = subprocess.run(
-        ['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', audio_file],
-        capture_output=True, text=True, check=True
-    )
-    duration = float(result.stdout.strip())
-    print(f"Audio duration detected: {duration:.2f} seconds")
-except Exception as e:
-    print(f"Warning: Could not determine audio duration with ffprobe. Using default 15 seconds. Error: {e}")
-    duration = 15
-
 width, height = 1280, 720
 fps = 24
-num_frames = max(1, int(fps * duration))
+# Set a fixed duration to ensure the text screen stays visible
+duration = 15  # seconds
+num_frames = fps * duration
 
 # Prepare video writer
 output_file = f"temp_ai_news_video.mp4" 
+# Use 'mp4v' for the intermediate video. The next step will re-encode.
 fourcc = cv2.VideoWriter_fourcc(*'mp4v') 
 video_writer = cv2.VideoWriter(output_file, fourcc, fps, (width, height))
 
@@ -82,71 +66,79 @@ font_scale = 1.5
 color = (255, 255, 255)
 thickness = 2
 bg_color = (0, 0, 0)
-display_text = news_text.replace("(The full video is below!)", "").strip() # Text to display on video
+display_text = gtts_text # Text to display on video is the TTS text
 
 for _ in range(num_frames):
     frame = np.full((height, width, 3), bg_color, dtype=np.uint8)
     y0, dy = height // 2, 50
-    # Simple logic to display the main news sentence
+    
+    # Render the text
     lines = display_text.split('\n')
     for i, line in enumerate(lines):
         if line.strip(): # Skip empty lines
+            # Calculate position relative to the center
             y = y0 + i * dy - (len(lines) * dy // 2)
             cv2.putText(frame, line.strip(), (50, y), font, font_scale, color, thickness, cv2.LINE_AA)
+            
     video_writer.write(frame)
 
 video_writer.release()
 
 # ------------------------------
 # Merge and re-encode audio/video using FFmpeg for compatibility
+# We REMOVE the -shortest flag to force the video to the full 15 seconds
 # ------------------------------
 final_output = f"ai_news_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
 
-# FFmpeg command (optimized for Telegram/H.264)
 subprocess.run([
     'ffmpeg', '-y',
-    '-i', output_file, # Input video (from OpenCV)
-    '-i', audio_file,  # Input audio (Your MP3 or gTTS fallback)
-    '-c:v', 'libx264', # Encode video to H.264 (robust codec)
-    '-preset', 'veryfast', # Faster encoding speed
-    '-pix_fmt', 'yuv420p', # Standard pixel format for maximum compatibility
-    '-c:a', 'aac',     # Encode audio to AAC (standard for MP4)
-    '-b:a', '192k',    # Audio bitrate
-    '-shortest',       # Finish encoding when the shortest input stream (audio) ends
+    '-i', output_file, # Input video (15 seconds)
+    '-i', audio_file,  # Input audio (e.g., 9 seconds)
+    '-c:v', 'libx264',
+    '-preset', 'veryfast',
+    '-pix_fmt', 'yuv420p',
+    '-c:a', 'aac',
+    '-b:a', '192k',
+    # '-shortest', <--- REMOVED: This forces video duration to match audio (which is short)
+    '-t', str(duration), # Add duration command to ensure the video is the full length
     final_output
 ], check=True)
 
 # Clean up temporary video file
 os.remove(output_file)
-# Note: Keep audio_file until we send the text message for the full caption
 
 # ------------------------------
-# Send *TEXT MESSAGE* to Telegram first
+# 1. Send TEXT MESSAGE to Telegram
 # ------------------------------
 print("Sending text message to Telegram...")
 text_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-requests.post(text_url, data={
+response = requests.post(text_url, data={
     "chat_id": TELEGRAM_CHAT_ID, 
-    "text": news_text, # Send the full text with the initial message
-    "parse_mode": "Markdown" # Allows for bold/emoji formatting in the text
+    "text": news_text, # Send the full text
+    "parse_mode": "Markdown"
 })
-time.sleep(1) # Add a small pause to ensure messages arrive in correct order
+if response.status_code != 200:
+    print(f"Error sending text message: {response.text}")
+
+time.sleep(1) # Pause to ensure the text message posts first
 
 # ------------------------------
-# Send *VIDEO* to Telegram
+# 2. Send VIDEO to Telegram
 # ------------------------------
 print("Sending video to Telegram...")
 with open(final_output, "rb") as f:
     video_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendVideo"
-    # The caption for the video will just be a quick tag
     video_caption = f"Full AI News Report - {datetime.now().strftime('%Y-%m-%d')}"
     
-    requests.post(video_url, data={
+    response = requests.post(video_url, data={
         "chat_id": TELEGRAM_CHAT_ID, 
         "caption": video_caption
     }, files={"video": f})
 
-print(f"✅ Text message and video sent to Telegram: {final_output}")
+if response.status_code != 200:
+    print(f"Error sending video: {response.text}")
+
+print(f"✅ Text message and video successfully processed: {final_output}")
 
 # Final cleanup
 os.remove(final_output)
