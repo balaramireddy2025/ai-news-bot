@@ -1,48 +1,67 @@
 import os
-import requests
-from gtts import gTTS
-from datetime import datetime
+import sys
+import subprocess
 
-# ✅ Correct MoviePy imports for 2.1.1 (no 'editor'!)
-from moviepy.video.VideoClip import TextClip
-from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
-from moviepy.audio.io.AudioFileClip import AudioFileClip
+# -----------------------------
+# Quick Dependency Check
+# -----------------------------
+def install_package(pkg):
+    """Try to pip install a package dynamically."""
+    print(f"🔧 Installing missing package: {pkg} ...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
 
-# Telegram config
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+# Check for moviepy
+try:
+    from moviepy.editor import TextClip, CompositeVideoClip, concatenate_videoclips, AudioFileClip
+except ImportError:
+    install_package("moviepy==1.0.3")
+    from moviepy.editor import TextClip, CompositeVideoClip, concatenate_videoclips, AudioFileClip
 
-# AI News content (placeholder)
-news_text = """
-AI is transforming the world: sustainability, 5G-A networks, and entrepreneurship are key areas to watch.
-"""
+# Check for requests
+try:
+    import requests
+except ImportError:
+    install_package("requests==2.31.0")
+    import requests
 
-# Convert text to speech
-tts = gTTS(text=news_text, lang="en")
-audio_file = "news.mp3"
-tts.save(audio_file)
+# Check for dotenv
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    install_package("python-dotenv==1.0.0")
+    from dotenv import load_dotenv
 
-# Create video clip
-text_clip = TextClip(
-    news_text,
-    fontsize=40,
-    color='white',
-    size=(1280, 720),
-    method='caption',
-    bg_color='black'
-).set_duration(15)
+# Check ffmpeg availability
+def check_ffmpeg():
+    try:
+        subprocess.run(["ffmpeg", "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        print("✅ ffmpeg is available")
+    except Exception:
+        print("⚠️ ffmpeg not found, trying to install...")
+        subprocess.check_call(["sudo", "apt-get", "update"])
+        subprocess.check_call(["sudo", "apt-get", "install", "-y", "ffmpeg"])
 
-# Add audio
-audio_clip = AudioFileClip(audio_file)
-video = text_clip.set_audio(audio_clip)
+check_ffmpeg()
 
-# Export MP4
-output_file = f"ai_news_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
-video.write_videofile(output_file, fps=24)
+# -----------------------------
+# Your AI News Bot Logic
+# -----------------------------
+load_dotenv()
 
-# Send to Telegram
-with open(output_file, "rb") as f:
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendVideo"
-    requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID}, files={"video": f})
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-print("✅ MP4 generated and sent to Telegram")
+def send_message(message):
+    """Send text to Telegram chat."""
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
+    response = requests.post(url, data=payload)
+    print("📨 Telegram response:", response.text)
+
+def main():
+    # Example placeholder - replace with your real news fetching/AI logic
+    news_headline = "📰 Today's AI News: MoviePy now auto-installs in your bot! 🚀"
+    send_message(news_headline)
+
+if __name__ == "__main__":
+    main()
