@@ -12,7 +12,8 @@ import sys # Import sys to exit on critical error
 # Quick FFmpeg check (We exit if it fails)
 # ------------------------------
 try:
-    subprocess.run(['ffmpeg', '-version'], check=True, stdout=subprocess.DEVNULL)
+    # Use DEVNULL to suppress output
+    subprocess.run(['ffmpeg', '-version'], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 except FileNotFoundError:
     sys.exit("FFmpeg not installed or not in PATH. Check scheduler.yml.")
 
@@ -40,7 +41,9 @@ Watch the video report below for the full story!
 # Convert text to speech (Using gTTS for now)
 # ------------------------------
 audio_file = "news.mp3"
-gtts_text = news_text.replace("Watch the video report below for the full story!", "").strip() 
+# Use clean text for gTTS generation
+# We specifically strip out the last line so the audio doesn't include the instruction to 'watch the video'
+gtts_text = "\n".join(news_text.splitlines()[:-1]).strip()
 tts = gTTS(text=gtts_text, lang="en")
 tts.save(audio_file)
 
@@ -49,7 +52,7 @@ tts.save(audio_file)
 # ------------------------------
 width, height = 1280, 720
 fps = 24
-duration = 15  # seconds - FORCED DURATION
+duration = 15  # seconds - FORCED DURATION to fix short video issue
 num_frames = fps * duration
 
 output_file = f"temp_ai_news_video.mp4" 
@@ -69,9 +72,13 @@ for _ in range(num_frames):
     
     # Render the text
     lines = display_text.split('\n')
+    # Center the block of text
+    text_height = len(lines) * dy
+    start_y = y0 - text_height // 2 
+    
     for i, line in enumerate(lines):
         if line.strip():
-            y = y0 + i * dy - (len(lines) * dy // 2)
+            y = start_y + i * dy
             cv2.putText(frame, line.strip(), (50, y), font, font_scale, color, thickness, cv2.LINE_AA)
             
     video_writer.write(frame)
@@ -79,8 +86,7 @@ for _ in range(num_frames):
 video_writer.release()
 
 # ------------------------------
-# Merge and re-encode audio/video using FFmpeg
-# ENSURE duration is set, and -shortest is NOT used.
+# Merge and re-encode audio/video using FFmpeg (FORCED DURATION FIX)
 # ------------------------------
 final_output = f"ai_news_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
 print(f"Starting FFmpeg to create a {duration}-second video...")
@@ -89,12 +95,12 @@ subprocess.run([
     'ffmpeg', '-y',
     '-i', output_file, # Input video (15 seconds)
     '-i', audio_file,  # Input audio (e.g., 9 seconds)
-    '-c:v', 'libx264',
-    '-preset', 'veryfast',
-    '-pix_fmt', 'yuv420p',
-    '-c:a', 'aac',
+    '-c:v', 'libx264',     # Use H.264 encoding for better compatibility (FIX)
+    '-preset', 'veryfast', # Faster encoding speed
+    '-pix_fmt', 'yuv420p', # Standard pixel format
+    '-c:a', 'aac',         # Use AAC for audio (FIX)
     '-b:a', '192k',
-    '-t', str(duration), # <-- FORCES DURATION TO 15 SECONDS
+    '-t', str(duration),   # <-- CRITICAL FIX: FORCES DURATION TO 15 SECONDS
     final_output
 ], check=True)
 
@@ -102,14 +108,14 @@ print(f"✅ Video created: {final_output}")
 os.remove(output_file)
 
 # ------------------------------
-# 1. Send TEXT MESSAGE to Telegram with robust error logging
+# 1. Send TEXT MESSAGE to Telegram with robust error logging (FIX)
 # ------------------------------
 print("--- Attempting to send text message to Telegram... ---")
 text_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
 response = requests.post(text_url, data={
     "chat_id": TELEGRAM_CHAT_ID, 
     "text": news_text,
-    "parse_mode": "Markdown"
+    "parse_mode": "Markdown" # Allows formatting like bold/emoji
 })
 
 if response.status_code == 200:
@@ -138,7 +144,6 @@ if response.status_code == 200:
 else:
     print(f"❌ Error sending video. Status Code: {response.status_code}")
     print(f"Response: {response.text}") # Print full response for debugging
-
 
 # Final cleanup
 os.remove(final_output)
