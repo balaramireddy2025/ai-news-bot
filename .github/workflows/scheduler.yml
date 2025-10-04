@@ -23,32 +23,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install --no-cache-dir -r requirements.txt
 
-      # FIX: Replaced shell here-document (<<EOF) with a robust multi-line execution.
-      - name: Check Python Dependencies and FFmpeg Availability
+      # FIX: Simplified Check step to avoid multi-line YAML syntax errors (previously lines 29-45)
+      - name: Verify FFmpeg and Dependencies
         run: |
-          python -c "
-import cv2
-import numpy
-import requests
-import subprocess
-import importlib.metadata
-from sys import exit
-
-# Check gTTS version
-try:
-    gtts_version = importlib.metadata.version('gTTS')
-except importlib.metadata.PackageNotFoundError:
-    exit('gTTS not installed')
-
-# Print versions
-print(f'OpenCV {cv2.__version__}, NumPy {numpy.__version__}, gTTS {gtts_version}')
-
-# Check FFmpeg
-try:
-    subprocess.run(['ffmpeg', '-version'], check=True, stdout=subprocess.DEVNULL)
-except FileNotFoundError:
-    exit('FFmpeg not found. Please ensure it is installed on the runner.')
-"
+          # Check FFmpeg is available
+          if ! command -v ffmpeg &> /dev/null; then
+              echo "Error: FFmpeg is not installed or not in PATH."
+              exit 1
+          fi
+          # Check Python dependencies are functional
+          python -c "import cv2, numpy, gtts, requests, subprocess; print('✅ Dependencies are functional.')"
+          
       - name: Run AI News Scheduler
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
