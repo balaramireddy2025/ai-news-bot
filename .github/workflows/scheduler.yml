@@ -23,7 +23,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install --no-cache-dir -r requirements.txt
 
-      # FIX: Simplified Check step to avoid multi-line YAML syntax errors (previously lines 29-45)
+      # NEW STEP: Install FFmpeg
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
       - name: Verify FFmpeg and Dependencies
         run: |
           # Check FFmpeg is available
