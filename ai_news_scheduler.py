@@ -6,7 +6,7 @@ import requests
 import subprocess
 from datetime import datetime
 import time 
-import sys # Import sys to exit on critical error
+import sys
 
 # ------------------------------
 # Quick FFmpeg check (We exit if it fails)
@@ -41,8 +41,7 @@ Watch the video report below for the full story!
 # Convert text to speech (Using gTTS for now)
 # ------------------------------
 audio_file = "news.mp3"
-# Use clean text for gTTS generation
-# We specifically strip out the last line so the audio doesn't include the instruction to 'watch the video'
+# Use clean text for gTTS generation (excluding the video instructions)
 gtts_text = "\n".join(news_text.splitlines()[:-1]).strip()
 tts = gTTS(text=gtts_text, lang="en")
 tts.save(audio_file)
@@ -52,10 +51,11 @@ tts.save(audio_file)
 # ------------------------------
 width, height = 1280, 720
 fps = 24
-duration = 15  # seconds - FORCED DURATION to fix short video issue
+duration = 15  # seconds - FORCED DURATION
 num_frames = fps * duration
 
 output_file = f"temp_ai_news_video.mp4" 
+# Use 'mp4v' for the intermediate video.
 fourcc = cv2.VideoWriter_fourcc(*'mp4v') 
 video_writer = cv2.VideoWriter(output_file, fourcc, fps, (width, height))
 
@@ -95,12 +95,12 @@ subprocess.run([
     'ffmpeg', '-y',
     '-i', output_file, # Input video (15 seconds)
     '-i', audio_file,  # Input audio (e.g., 9 seconds)
-    '-c:v', 'libx264',     # Use H.264 encoding for better compatibility (FIX)
+    '-c:v', 'libx264',     # CRITICAL: Re-encode video stream
     '-preset', 'veryfast', # Faster encoding speed
     '-pix_fmt', 'yuv420p', # Standard pixel format
-    '-c:a', 'aac',         # Use AAC for audio (FIX)
+    '-c:a', 'aac',         # Use AAC for audio
     '-b:a', '192k',
-    '-t', str(duration),   # <-- CRITICAL FIX: FORCES DURATION TO 15 SECONDS
+    '-t', '15.0',          # <-- CRITICAL FIX: FORCES DURATION TO 15.0 SECONDS
     final_output
 ], check=True)
 
@@ -115,7 +115,7 @@ text_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
 response = requests.post(text_url, data={
     "chat_id": TELEGRAM_CHAT_ID, 
     "text": news_text,
-    "parse_mode": "Markdown" # Allows formatting like bold/emoji
+    "parse_mode": "Markdown" 
 })
 
 if response.status_code == 200:
