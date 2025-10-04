@@ -2,11 +2,11 @@ name: AI News Daily Scheduler
 
 on:
   schedule:
-    - cron: "40 4 * * *"   # Runs daily at 04:40 UTC
+    - cron: "40 4 * * *"   # runs every day at 04:40 UTC
   workflow_dispatch:
 
 jobs:
-  build:
+  run-ai-news:
     runs-on: ubuntu-latest
 
     steps:
@@ -18,14 +18,21 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Install system dependencies (ffmpeg)
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
 
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          # safety net: explicitly pin moviepy in case requirements.txt misses it
+          pip install moviepy==1.0.3
 
       - name: Run AI News Scheduler
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           python ai_news_scheduler.py
