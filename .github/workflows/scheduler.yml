@@ -2,11 +2,11 @@ name: AI News Daily Scheduler
 
 on:
   schedule:
-    - cron: "30 4 * * *"   # Runs daily at 04:30 UTC
-  workflow_dispatch:        # Allow manual trigger
+    - cron: "40 4 * * *"   # Runs daily at 04:40 UTC
+  workflow_dispatch:
 
 jobs:
-  run-news-scheduler:
+  build:
     runs-on: ubuntu-latest
 
     steps:
@@ -26,11 +26,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: List installed packages (debug)
-        run: python -m pip list
-
       - name: Run AI News Scheduler
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python ai_news_scheduler.py
+        run: |
+          python ai_news_scheduler.py
