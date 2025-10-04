@@ -13,9 +13,17 @@ except ImportError as e:
     print(f"❌ Missing Python package: {e.name}")
     sys.exit(1)
 
-# Check FFmpeg availability
+print(f"✅ Python packages loaded successfully:")
+print(f"   OpenCV version: {cv2.__version__}")
+print(f"   NumPy version: {np.__version__}")
+print(f"   gTTS version: {gTTS.__version__}")
+print(f"   requests version: {requests.__version__}")
+
+# Check FFmpeg
 try:
-    subprocess.run(["ffmpeg", "-version"], check=True, stdout=subprocess.DEVNULL)
+    result = subprocess.run(["ffmpeg", "-version"], check=True, capture_output=True, text=True)
+    print("✅ FFmpeg is installed:")
+    print(result.stdout.splitlines()[0])
 except FileNotFoundError:
     print("❌ FFmpeg is not installed or not in PATH")
     sys.exit(1)
@@ -27,7 +35,7 @@ if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
     print("❌ TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set")
     sys.exit(1)
 
-# News text (placeholder)
+# News text
 news_text = "AI is transforming the world: sustainability, 5G-A networks, and entrepreneurship are key areas to watch."
 
 # Convert text to speech
@@ -38,7 +46,7 @@ tts.save(audio_file)
 # Create video frames
 width, height = 1280, 720
 fps = 24
-duration = 10  # seconds
+duration = 10
 num_frames = fps * duration
 
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -46,9 +54,7 @@ video_file = f"ai_news_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
 out = cv2.VideoWriter(video_file, fourcc, fps, (width, height))
 
 for i in range(num_frames):
-    # black background
     frame = np.zeros((height, width, 3), dtype=np.uint8)
-    # add text in white at center
     cv2.putText(frame, news_text, (50, height // 2), cv2.FONT_HERSHEY_SIMPLEX,
                 1, (255, 255, 255), 2, cv2.LINE_AA)
     out.write(frame)
