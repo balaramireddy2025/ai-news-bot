@@ -1,140 +1,153 @@
-<!-- Firebase Scripts -->
-<script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js"></script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+            padding: 20px;
+            max-width: 600px;
+            margin: 50px auto;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; }
+        .status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        .news-item {
+            background: #f9f9f9;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #667eea;
+            border-radius: 3px;
+        }
+        .news-title {
+            font-weight: bold;
+            color: #333;
+        }
+        .news-desc {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Firebase Connection Test</h1>
+        
+        <div id="status"></div>
+        <div id="newsContainer"></div>
+    </div>
 
-<script>
-    // Firebase Configuration - COMPLETE AND CORRECT
-    const firebaseConfig = {
-        apiKey: "AIzaSyBEOVKrdLE7G3TnxWtCjnYIqRNcO4vXQPM",
-        authDomain: "ai-news-a0483.firebaseapp.com",
-        projectId: "ai-news-a0483",
-        storageBucket: "ai-news-a0483.firebasestorage.app",
-        messagingSenderId: "227037934522",
-        appId: "1:227037934522:web:af54212806891a09e46383",
-        databaseURL: "https://ai-news-a0483-default-rtdb.firebaseio.com"
-    };
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js"></script>
 
-    let allNews = [];
-    let currentFilter = 'all';
+    <script>
+        const statusDiv = document.getElementById('status');
+        const newsDiv = document.getElementById('newsContainer');
 
-    // Initialize Firebase
-    try {
-        firebase.initializeApp(firebaseConfig);
-        console.log('✅ Firebase initialized successfully!');
-    } catch (error) {
-        console.error('❌ Firebase initialization error:', error);
-    }
+        // Firebase Config
+        const firebaseConfig = {
+            apiKey: "AIzaSyBEOVKrdLE7G3TnxWtCjnYIqRNcO4vXQPM",
+            authDomain: "ai-news-a0483.firebaseapp.com",
+            projectId: "ai-news-a0483",
+            storageBucket: "ai-news-a0483.firebasestorage.app",
+            messagingSenderId: "227037934522",
+            appId: "1:227037934522:web:af54212806891a09e46383",
+            databaseURL: "https://ai-news-a0483-default-rtdb.firebaseio.com"
+        };
 
-    const db = firebase.database();
-
-    // Load news from Firebase
-    function loadNews() {
-        console.log('🔄 Attempting to load news from Firebase...');
+        console.log('Starting Firebase initialization...');
+        addStatus('Initializing Firebase...', 'info');
 
         try {
-            const newsRef = db.ref('news');
-
-            newsRef.on('value', (snapshot) => {
-                if (snapshot.exists()) {
-                    allNews = snapshot.val();
-                    console.log('✅ Successfully loaded', allNews.length, 'articles from Firebase');
-
-                    // Update last updated time
-                    if (allNews && allNews.length > 0 && allNews[0].fetchedAt) {
-                        const lastFetch = new Date(allNews[0].fetchedAt);
-                        document.getElementById('lastUpdated').innerHTML =
-                            `✅ Last updated: ${lastFetch.toLocaleString()}`;
-                    }
-
-                    renderNews();
-                } else {
-                    console.warn('⚠️ No data in Firebase. Run your bot first!');
-                    showError('⚠️ No news data yet. Run your Python bot: python main.py');
-                    showWaitingMessage();
-                }
-            }, (error) => {
-                console.error('❌ Firebase read error:', error.code, error.message);
-                showError('Firebase Error: ' + error.message);
-                showWaitingMessage();
-            });
+            firebase.initializeApp(firebaseConfig);
+            console.log('✅ Firebase app initialized');
+            addStatus('✅ Firebase initialized successfully!', 'success');
         } catch (error) {
-            console.error('❌ Error setting up Firebase listener:', error);
-            showError('Setup Error: ' + error.message);
-        }
-    }
-
-    function renderNews() {
-        const newsGrid = document.getElementById('newsGrid');
-        newsGrid.innerHTML = '';
-
-        const filtered = currentFilter === 'all'
-            ? allNews
-            : allNews.filter(n => n.category === currentFilter);
-
-        if (filtered.length === 0) {
-            newsGrid.innerHTML = '<div class="loading">No news in this category</div>';
+            console.error('Firebase init error:', error);
+            addStatus('❌ Firebase initialization failed: ' + error.message, 'error');
             return;
         }
 
-        filtered.forEach((news, index) => {
-            const newsCard = document.createElement('div');
-            newsCard.className = 'news-card';
-            newsCard.style.animationDelay = (index * 0.1) + 's';
-            newsCard.innerHTML = `
-                <div class="card-image ${news.category || 'ai'}">
-                    <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
-                        <span>${news.emoji || '📰'}</span>
-                        ${news.category === 'breaking' ? '<div class="breaking-badge">🔴 BREAKING</div>' : ''}
-                    </div>
-                </div>
-                <div class="card-content">
-                    <span class="card-category ${news.category || 'ai'}">${(news.category || 'news').toUpperCase()}</span>
-                    <h3 class="card-title">${news.title}</h3>
-                    <p class="card-description">${news.description || 'No description available'}</p>
-                    <div class="card-meta">
-                        <div class="card-date">📅 ${news.date || 'Unknown'}</div>
-                        <a class="read-more" href="${news.url || '#'}" target="_blank">Read More →</a>
-                    </div>
-                </div>
-            `;
-            newsGrid.appendChild(newsCard);
+        const db = firebase.database();
+        console.log('Database reference created');
+
+        // Try to load news
+        addStatus('Connecting to database...', 'info');
+
+        const newsRef = db.ref('news');
+
+        newsRef.once('value', (snapshot) => {
+            if (snapshot.exists()) {
+                const data = snapshot.val();
+                console.log('✅ Data found:', data);
+                addStatus('✅ Successfully connected to Firebase and found news data!', 'success');
+                
+                // Display news
+                if (Array.isArray(data)) {
+                    newsDiv.innerHTML = '<h2>📰 Latest News (' + data.length + ' articles)</h2>';
+                    data.slice(0, 5).forEach((news, idx) => {
+                        newsDiv.innerHTML += `
+                            <div class="news-item">
+                                <div class="news-title">${idx + 1}. ${news.title}</div>
+                                <div class="news-desc">${news.description || 'No description'}</div>
+                                <small>Category: ${news.category} | Date: ${news.date}</small>
+                            </div>
+                        `;
+                    });
+                }
+            } else {
+                console.log('No data in Firebase');
+                addStatus('⚠️ No news data in Firebase. Your bot needs to run first!', 'error');
+                addStatus('Run this command: <code>python main.py</code>', 'info');
+            }
+        }).catch((error) => {
+            console.error('Database read error:', error);
+            addStatus('❌ Database connection error: ' + error.message, 'error');
         });
-    }
 
-    function filterNews(category) {
-        currentFilter = category;
-
-        document.querySelectorAll('.filter-btn').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        event.target.classList.add('active');
-
-        renderNews();
-    }
-
-    function showError(message) {
-        const errorContainer = document.getElementById('errorContainer');
-        errorContainer.innerHTML = `<div class="error-message">${message}</div>`;
-    }
-
-    function showWaitingMessage() {
-        const newsGrid = document.getElementById('newsGrid');
-        newsGrid.innerHTML = `
-            <div class="demo-news" style="grid-column: 1 / -1; text-align: center;">
-                <h3>⏳ Waiting for news data...</h3>
-                <p><strong>Step 1:</strong> Run your Python bot:</p>
-                <p><code style="background: #333; padding: 10px; display: block; margin: 10px 0; border-radius: 5px;">python main.py</code></p>
-                <p><strong>Step 2:</strong> Wait for bot to fetch news</p>
-                <p><strong>Step 3:</strong> Refresh this page</p>
-                <p style="margin-top: 20px; color: #ccc;">Bot output should show: ✅ Updated Firebase with X articles</p>
-            </div>
-        `;
-    }
-
-    // Load news on page load
-    console.log('🚀 AI Comic News Website initialized');
-    loadNews();
-
-    // Refresh every 5 minutes
-    setInterval(loadNews, 5 * 60 * 1000);
-</script>
+        function addStatus(message, type) {
+            const div = document.createElement('div');
+            div.className = 'status ' + type;
+            div.innerHTML = message;
+            statusDiv.appendChild(div);
+            console.log(message);
+        }
+    </script>
+</body>
+</html>
