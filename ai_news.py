@@ -5,7 +5,7 @@ import requests
 from datetime import datetime
 from pathlib import Path
 import firebase_admin
-from firebase_admin import db
+from firebase_admin import db, credentials
 from apscheduler.schedulers.background import BackgroundScheduler
 from PIL import Image, ImageDraw, ImageFont
 from dotenv import load_dotenv
@@ -16,24 +16,30 @@ load_dotenv()
 # Configuration
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "YOUR_BOT_TOKEN")
 TELEGRAM_CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID", "YOUR_CHANNEL_ID")
+
+# Firebase config with proper quotes
 FIREBASE_CONFIG = {
-  apiKey: "AIzaSyBEOVKrdLE7G3TnxWtCjnYIqRNcO4vXQPM",
-  authDomain: "ai-news-a0483.firebaseapp.com",
-  databaseURL: "https://ai-news-a0483-default-rtdb.firebaseio.com",
-  projectId: "ai-news-a0483",
-  storageBucket: "ai-news-a0483.firebasestorage.app",
-  messagingSenderId: "227037934522",
-  appId: "1:227037934522:web:af54212806891a09e46383",
-  measurementId: "G-ZNZBQEL8VT"
+    "apiKey": "AIzaSyBEOVKrdLE7G3TnxWtCjnYIqRNcO4vXQPM",
+    "authDomain": "ai-news-a0483.firebaseapp.com",
+    "databaseURL": "https://ai-news-a0483-default-rtdb.firebaseio.com",
+    "projectId": "ai-news-a0483",
+    "storageBucket": "ai-news-a0483.firebasestorage.app",
+    "messagingSenderId": "227037934522",
+    "appId": "1:227037934522:web:af54212806891a09e46383"
 }
+
 NEWS_API_KEY = os.getenv("NEWS_API_KEY", "YOUR_NEWS_API_KEY")
 PUBLISH_TIME = os.getenv("PUBLISH_TIME", "09:00")
 
-# Initialize Firebase
-if not firebase_admin.get_app():
-    firebase_admin.initialize_app(options={
-        'databaseURL': FIREBASE_CONFIG['databaseURL']
-    })
+# Initialize Firebase correctly
+try:
+    if not firebase_admin.get_app():
+        firebase_admin.initialize_app(options={
+            'databaseURL': FIREBASE_CONFIG['databaseURL']
+        })
+    print("✅ Firebase initialized successfully")
+except Exception as e:
+    print(f"⚠️ Firebase already initialized or error: {e}")
 
 OUTPUT_DIR = Path("./news_images")
 OUTPUT_DIR.mkdir(exist_ok=True)
@@ -43,6 +49,10 @@ WEBHOOK_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 print("=" * 60)
 print("🎨 AI NEWS COMIC GENERATOR & WEBPAGE UPDATER")
 print("=" * 60)
+print(f"📍 Firebase URL: {FIREBASE_CONFIG['databaseURL']}")
+print(f"📰 News API Key: {'✅' if NEWS_API_KEY != 'YOUR_NEWS_API_KEY' else '❌ NOT SET'}")
+print(f"📱 Telegram Token: {'✅' if TELEGRAM_BOT_TOKEN != 'YOUR_BOT_TOKEN' else '❌ NOT SET'}")
+print("=" * 60 + "\n")
 
 # ============================================================
 # STEP 1: FETCH AI NEWS FROM NEWS API
@@ -62,9 +72,14 @@ def fetch_ai_news(num_articles=10):
             'apiKey': NEWS_API_KEY
         }
         
-        response = requests.get(url, params=params)
-        articles = response.json()['articles']
+        response = requests.get(url, params=params, timeout=10)
+        data = response.json()
         
+        if 'articles' not in data:
+            print(f"❌ Error from NewsAPI: {data.get('message', 'Unknown error')}")
+            return []
+        
+        articles = data['articles']
         print(f"✅ Fetched {len(articles)} articles")
         return articles
     
@@ -233,7 +248,7 @@ def send_to_telegram(image_path, title, source):
                 'parse_mode': 'HTML'
             }
             
-            response = requests.post(f"{WEBHOOK_URL}/sendPhoto", files=files, data=data)
+            response = requests.post(f"{WEBHOOK_URL}/sendPhoto", files=files, data=data, timeout=10)
             
             if response.status_code == 200:
                 print(f"  ✅ Sent to Telegram")
@@ -258,7 +273,7 @@ def daily_news_job():
     print("=" * 60)
     
     # 1. Fetch news
-    articles = fetch_ai_news(num_articles=6)
+    articles = fetch_ai_news(num_articles=10)
     
     if not articles:
         print("❌ No articles fetched, skipping...")
