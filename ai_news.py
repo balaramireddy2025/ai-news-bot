@@ -17,10 +17,14 @@ load_dotenv()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "YOUR_BOT_TOKEN")
 TELEGRAM_CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID", "YOUR_CHANNEL_ID")
 FIREBASE_CONFIG = {
-    "apiKey": os.getenv("FIREBASE_API_KEY"),
-    "authDomain": os.getenv("FIREBASE_AUTH_DOMAIN"),
-    "databaseURL": os.getenv("FIREBASE_DATABASE_URL"),
-    "projectId": os.getenv("FIREBASE_PROJECT_ID"),
+  apiKey: "AIzaSyBEOVKrdLE7G3TnxWtCjnYIqRNcO4vXQPM",
+  authDomain: "ai-news-a0483.firebaseapp.com",
+  databaseURL: "https://ai-news-a0483-default-rtdb.firebaseio.com",
+  projectId: "ai-news-a0483",
+  storageBucket: "ai-news-a0483.firebasestorage.app",
+  messagingSenderId: "227037934522",
+  appId: "1:227037934522:web:af54212806891a09e46383",
+  measurementId: "G-ZNZBQEL8VT"
 }
 NEWS_API_KEY = os.getenv("NEWS_API_KEY", "YOUR_NEWS_API_KEY")
 PUBLISH_TIME = os.getenv("PUBLISH_TIME", "09:00")
