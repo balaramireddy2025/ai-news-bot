@@ -27,17 +27,40 @@
             text-align: center;
             color: white;
             margin-bottom: 50px;
+            animation: slideDown 0.8s ease;
         }
 
         header h1 {
             font-size: 48px;
             margin-bottom: 10px;
             text-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            letter-spacing: 2px;
         }
 
         header p {
             font-size: 18px;
             opacity: 0.9;
+            margin-bottom: 20px;
+        }
+
+        .last-updated {
+            background: rgba(255,255,255,0.1);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 13px;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .filters {
@@ -61,15 +84,17 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
 
-        .filter-btn:hover, .filter-btn.active {
+        .filter-btn:hover,
+        .filter-btn.active {
             background: #667eea;
             color: white;
             transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
         }
 
         .news-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
             gap: 30px;
             margin-bottom: 40px;
         }
@@ -81,7 +106,14 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             transition: all 0.3s ease;
             border: 4px solid #000;
-            cursor: pointer;
+            animation: fadeIn 0.6s ease forwards;
+            opacity: 0;
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
         }
 
         .news-card:hover {
@@ -91,13 +123,52 @@
 
         .card-image {
             width: 100%;
-            height: 300px;
+            height: 280px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 100px;
+            position: relative;
             overflow: hidden;
+        }
+
+        .card-image.breaking {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+        }
+
+        .card-image.ai {
+            background: linear-gradient(135deg, #00d4ff 0%, #0088ff 100%);
+        }
+
+        .card-image.cloud {
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+        }
+
+        .card-image.crypto {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+        }
+
+        .breaking-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #ff6b6b;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 12px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.1);
+            }
         }
 
         .card-content {
@@ -140,10 +211,11 @@
         }
 
         .card-description {
-            font-size: 14px;
+            font-size: 13px;
             color: #666;
             line-height: 1.6;
             margin-bottom: 15px;
+            min-height: 40px;
         }
 
         .card-meta {
@@ -166,32 +238,83 @@
             font-weight: bold;
             text-decoration: none;
             font-size: 12px;
+            transition: all 0.3s ease;
         }
 
         .read-more:hover {
             background: #764ba2;
+            transform: scale(1.05);
         }
 
         .loading {
             text-align: center;
             color: white;
-            padding: 40px;
+            padding: 60px 20px;
             font-size: 18px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 15px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .error-message {
+            background: #ff6b6b;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+
+        .demo-news {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            color: white;
+            margin: 30px 0;
         }
 
         footer {
             text-align: center;
             color: white;
             padding: 30px 0;
+            border-top: 2px solid rgba(255, 255, 255, 0.2);
+            margin-top: 60px;
         }
 
-        .last-updated {
-            background: rgba(255,255,255,0.1);
-            padding: 10px 20px;
-            border-radius: 20px;
-            font-size: 13px;
-            display: inline-block;
-            margin-bottom: 20px;
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 32px;
+            }
+
+            .news-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .filters {
+                gap: 8px;
+            }
+
+            .filter-btn {
+                padding: 10px 16px;
+                font-size: 12px;
+            }
         }
     </style>
 </head>
@@ -211,21 +334,29 @@
             <button class="filter-btn" onclick="filterNews('crypto')">💰 Crypto</button>
         </div>
 
+        <div id="errorContainer"></div>
+
         <div class="news-grid" id="newsGrid">
-            <div class="loading">Loading news...</div>
+            <div class="loading">
+                <div class="spinner"></div>
+                Fetching latest AI news...
+            </div>
         </div>
 
         <footer>
             <p>© 2025 AI Comic News | Auto-Updated Daily</p>
+            <p>Powered by NewsAPI.org & Firebase</p>
         </footer>
     </div>
 
+    <!-- Firebase Scripts -->
     <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js"></script>
 
     <script>
+        // ⚠️ REPLACE THIS WITH YOUR ACTUAL FIREBASE CONFIG ⚠️
         const firebaseConfig = {
-            apiKey: "YOUR_FIREBASE_API_KEY",
+            apiKey: "YOUR_FIREBASE_API_KEY_HERE",
             authDomain: "YOUR_PROJECT.firebaseapp.com",
             databaseURL: "https://YOUR_PROJECT.firebaseio.com",
             projectId: "YOUR_PROJECT",
@@ -234,21 +365,50 @@
             appId: "YOUR_APP_ID"
         };
 
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
-
         let allNews = [];
         let currentFilter = 'all';
+        let isFirebaseConnected = false;
 
+        // Initialize Firebase
+        try {
+            firebase.initializeApp(firebaseConfig);
+            console.log('✅ Firebase initialized');
+        } catch (error) {
+            console.error('❌ Firebase init error:', error);
+            showError('Firebase configuration error. Please check your credentials.');
+        }
+
+        const db = firebase.database();
+
+        // Load news from Firebase
         function loadNews() {
-            db.ref('news').on('value', (snapshot) => {
+            console.log('🔄 Loading news from Firebase...');
+
+            const newsRef = db.ref('news');
+
+            newsRef.on('value', (snapshot) => {
                 if (snapshot.exists()) {
                     allNews = snapshot.val();
-                    const lastFetch = new Date(allNews[0]?.fetchedAt);
-                    document.getElementById('lastUpdated').innerHTML = 
-                        `✅ Last updated: ${lastFetch.toLocaleString()}`;
+                    isFirebaseConnected = true;
+                    console.log('✅ News loaded:', allNews.length, 'articles');
+
+                    // Update last updated time
+                    if (allNews && allNews.length > 0 && allNews[0].fetchedAt) {
+                        const lastFetch = new Date(allNews[0].fetchedAt);
+                        document.getElementById('lastUpdated').innerHTML =
+                            `✅ Last updated: ${lastFetch.toLocaleString()}`;
+                    }
+
                     renderNews();
+                } else {
+                    console.warn('⚠️ No data in Firebase');
+                    showError('⚠️ No news data available yet. Bot will publish at 09:00 AM daily.');
+                    showDemoNews();
                 }
+            }, (error) => {
+                console.error('❌ Firebase error:', error);
+                showError('⚠️ Could not connect to Firebase. Check your configuration.');
+                showDemoNews();
             });
         }
 
@@ -256,37 +416,74 @@
             const newsGrid = document.getElementById('newsGrid');
             newsGrid.innerHTML = '';
 
-            const filtered = currentFilter === 'all' 
-                ? allNews 
+            const filtered = currentFilter === 'all'
+                ? allNews
                 : allNews.filter(n => n.category === currentFilter);
 
-            filtered.forEach(news => {
-                const card = document.createElement('div');
-                card.className = 'news-card';
-                card.innerHTML = `
-                    <div class="card-image">${news.emoji}</div>
+            if (filtered.length === 0) {
+                newsGrid.innerHTML = '<div class="loading">No news in this category</div>';
+                return;
+            }
+
+            filtered.forEach((news, index) => {
+                const newsCard = document.createElement('div');
+                newsCard.className = 'news-card';
+                newsCard.style.animationDelay = (index * 0.1) + 's';
+                newsCard.innerHTML = `
+                    <div class="card-image ${news.category || 'ai'}">
+                        <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                            <span>${news.emoji || '📰'}</span>
+                            ${news.category === 'breaking' ? '<div class="breaking-badge">🔴 BREAKING</div>' : ''}
+                        </div>
+                    </div>
                     <div class="card-content">
-                        <span class="card-category ${news.category}">${news.category.toUpperCase()}</span>
+                        <span class="card-category ${news.category || 'ai'}">${(news.category || 'news').toUpperCase()}</span>
                         <h3 class="card-title">${news.title}</h3>
-                        <p class="card-description">${news.description}</p>
+                        <p class="card-description">${news.description || 'No description available'}</p>
                         <div class="card-meta">
-                            <div>📅 ${news.date}</div>
-                            <a class="read-more" href="${news.url}" target="_blank">Read More</a>
+                            <div class="card-date">📅 ${news.date || 'Unknown'}</div>
+                            <a class="read-more" href="${news.url || '#'}" target="_blank">Read More →</a>
                         </div>
                     </div>
                 `;
-                newsGrid.appendChild(card);
+                newsGrid.appendChild(newsCard);
             });
         }
 
         function filterNews(category) {
             currentFilter = category;
-            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
             event.target.classList.add('active');
+
             renderNews();
         }
 
+        function showError(message) {
+            const errorContainer = document.getElementById('errorContainer');
+            errorContainer.innerHTML = `<div class="error-message">${message}</div>`;
+        }
+
+        function showDemoNews() {
+            // Show demo data while waiting for bot to run
+            const newsGrid = document.getElementById('newsGrid');
+            newsGrid.innerHTML = `
+                <div class="demo-news">
+                    <h3>⏳ Waiting for news data...</h3>
+                    <p>Your bot will automatically publish the first batch at 09:00 AM daily.</p>
+                    <p>Once your bot runs, this page will show the latest AI news in comic style!</p>
+                </div>
+            `;
+        }
+
+        // Load news on page load
+        console.log('🚀 AI Comic News Website loaded');
         loadNews();
+
+        // Refresh every 5 minutes
+        setInterval(loadNews, 5 * 60 * 1000);
     </script>
 </body>
 </html>
